@@ -6,7 +6,15 @@ import {
   listenBookings,
   updateBookingStatus,
 } from "../firebase/services";
-import { X, Copy, QrCode, CalendarDays, KeyRound, User } from "lucide-react";
+import {
+  X,
+  Copy,
+  QrCode,
+  CalendarDays,
+  KeyRound,
+  User,
+  Download,
+} from "lucide-react";
 
 export default function Bookings() {
   const [bookings, setBookings] = useState([]);
@@ -64,6 +72,31 @@ export default function Bookings() {
       setCopied(false);
     }, 1500);
   };
+
+  const handleDownloadQR = (canvasId, guestName = "guest") => {
+  const canvas = document.getElementById(canvasId);
+
+  if (!canvas) {
+    alert("QR code not found.");
+    return;
+  }
+
+  const pngUrl = canvas
+    .toDataURL("image/png")
+    .replace("image/png", "image/octet-stream");
+
+  const safeGuestName = guestName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-");
+
+  const downloadLink = document.createElement("a");
+  downloadLink.href = pngUrl;
+  downloadLink.download = `${safeGuestName}-qr-code.png`;
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+};
 
   const formatDateTime = (dateValue) => {
     if (!dateValue) return "-";
@@ -178,7 +211,7 @@ export default function Bookings() {
 
               <div className="flex flex-col md:flex-row gap-6 items-center">
                 <div className="bg-white p-4 rounded-xl border">
-                  <QRCodeCanvas value={createdQR.qrToken} size={180} />
+                  <QRCodeCanvas id="created-booking-qr" value={createdQR.qrToken} size={180} />
                 </div>
 
                 <div className="w-full">
@@ -204,6 +237,16 @@ export default function Bookings() {
                       Token copied.
                     </p>
                   )}
+                  <button
+                  onClick={() =>
+                    handleDownloadQR("created-booking-qr", createdQR.guestName)
+                  }
+                  className="mt-3 inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                  type="button"
+                  >
+                    <Download size={18} />
+                    Download QR Code
+                  </button>
                 </div>
               </div>
             </div>
@@ -374,7 +417,10 @@ export default function Bookings() {
 
                 <div className="flex justify-center">
                   <div className="bg-white p-4 rounded-2xl border border-slate-200">
-                    <QRCodeCanvas value={selectedBooking.qrToken} size={220} />
+                    <QRCodeCanvas 
+                    id={`booking-qr-${selectedBooking.id}`} 
+                    value={selectedBooking.qrToken} 
+                    size={220} />
                   </div>
                 </div>
 
@@ -399,6 +445,19 @@ export default function Bookings() {
                       QR token copied.
                     </p>
                   )}
+                   <button
+                    onClick={() =>
+                      handleDownloadQR(
+                        `booking-qr-${selectedBooking.id}`,
+                        selectedBooking.guestName
+                      )
+                    }
+                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                    type="button"
+                    >
+                      <Download size={18} />
+                      Download QR Code
+                    </button>
                 </div>
 
                 <div className="mt-5 p-4 rounded-xl bg-blue-50 text-blue-700 text-sm">

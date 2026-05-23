@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Bell,
   LogOut,
+  Cpu,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,6 +16,7 @@ const links = [
   { to: "/keys", label: "Keys", icon: KeyRound },
   { to: "/logs", label: "Logs", icon: ClipboardList },
   { to: "/notifications", label: "Notifications", icon: Bell },
+  { to: "/device-control", label: "Device Control", icon: Cpu },
 ];
 
 export default function Layout() {

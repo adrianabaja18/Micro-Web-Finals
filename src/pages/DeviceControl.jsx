@@ -47,7 +47,7 @@ export default function DeviceControl() {
   }, []);
 
   const activeBookings = bookings.filter(
-    (booking) => booking.status === "active" || booking.status === "in_use"
+    (booking) => booking.status === "active" || booking.status === "in_use",
   );
 
   async function handleValidateQr(e) {
@@ -232,7 +232,10 @@ export default function DeviceControl() {
             <h2 className="text-lg font-bold">QR Validation Simulation</h2>
           </div>
 
-          <form onSubmit={handleValidateQr} className="flex flex-col md:flex-row gap-3">
+          <form
+            onSubmit={handleValidateQr}
+            className="flex flex-col md:flex-row gap-3"
+          >
             <input
               value={qrToken}
               onChange={(e) => setQrToken(e.target.value)}

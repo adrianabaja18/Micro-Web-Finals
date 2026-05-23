@@ -123,7 +123,7 @@ export async function createOrUpdateKey(keyId, data) {
       ...data,
       updatedAt: serverTimestamp(),
     },
-    { merge: true }
+    { merge: true },
   );
 
   await addLog({
@@ -182,7 +182,7 @@ export async function validateQrToken(qrToken) {
 
   const bookingQuery = query(
     collection(db, "bookings"),
-    where("qrToken", "==", qrToken)
+    where("qrToken", "==", qrToken),
   );
 
   const bookingSnapshot = await getDocs(bookingQuery);
@@ -311,7 +311,7 @@ export async function validateQrToken(qrToken) {
 
   const keyQuery = query(
     collection(db, "keys"),
-    where("__name__", "==", booking.keyId)
+    where("__name__", "==", booking.keyId),
   );
 
   const keySnapshot = await getDocs(keyQuery);
@@ -436,7 +436,7 @@ export async function overrideDispenseKey(booking) {
 
   const keyQuery = query(
     collection(db, "keys"),
-    where("__name__", "==", booking.keyId)
+    where("__name__", "==", booking.keyId),
   );
 
   const keySnapshot = await getDocs(keyQuery);
@@ -468,7 +468,7 @@ export async function overrideDispenseKey(booking) {
     });
 
     throw new Error(
-      `Cannot override. ${booking.keyId} is currently ${key.status}.`
+      `Cannot override. ${booking.keyId} is currently ${key.status}.`,
     );
   }
 
@@ -550,7 +550,10 @@ export async function verifyReturnedKey(rfidUid) {
     lastRfidUid: rfidUid,
   });
 
-  const keyQuery = query(collection(db, "keys"), where("rfidUid", "==", rfidUid));
+  const keyQuery = query(
+    collection(db, "keys"),
+    where("rfidUid", "==", rfidUid),
+  );
   const keySnapshot = await getDocs(keyQuery);
 
   if (keySnapshot.empty) {
@@ -673,7 +676,7 @@ export function listenLogs(callback) {
     (error) => {
       console.error("Error listening to logs:", error);
       callback([]);
-    }
+    },
   );
 }
 
@@ -707,7 +710,7 @@ export function listenNotifications(callback) {
     (error) => {
       console.error("Error listening to notifications:", error);
       callback([]);
-    }
+    },
   );
 }
 
@@ -737,7 +740,7 @@ export async function createDeviceIfMissing() {
       lastError: "",
       updatedAt: serverTimestamp(),
     },
-    { merge: true }
+    { merge: true },
   );
 }
 
@@ -748,7 +751,7 @@ export async function updateDeviceStatus(data) {
       ...data,
       updatedAt: serverTimestamp(),
     },
-    { merge: true }
+    { merge: true },
   );
 }
 

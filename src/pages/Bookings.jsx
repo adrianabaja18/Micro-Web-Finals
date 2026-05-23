@@ -67,6 +67,21 @@ export default function Bookings() {
     });
   };
 
+  const handleGrantAccess = async (booking) => {
+  const confirmed = window.confirm(
+    `Grant access again for ${booking.guestName}? This will reactivate the booking.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await updateBookingStatus(booking.id, "active");
+    setOverrideMessage("Booking access has been granted again.");
+  } catch (error) {
+    setOverrideMessage(error.message);
+  }
+};
+
   const handleCopyToken = async (token) => {
     await navigator.clipboard.writeText(token);
     setCopied(true);
@@ -519,19 +534,41 @@ export default function Bookings() {
                     selectedBooking.status === "completed" ||
                     selectedBooking.status === "revoked"
                   }
-                  className="px-5 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50"
+                  className="px-5 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+                  title={
+                    selectedBooking.status === "revoked"
+                      ? "Cannot override a revoked booking. Grant access first."
+                      : selectedBooking.keyDispensed
+                        ? "Key is already dispensed."
+                        : selectedBooking.status === "completed"
+                          ? "Booking is already completed."
+                          : "Manually dispense this key without QR validation."
+                  }
                 >
                   {overrideLoading ? "Processing..." : "Override Dispense Key"}
                 </button>
 
-                <button
-                  onClick={() =>
-                    updateBookingStatus(selectedBooking.id, "revoked")
-                  }
-                  className="px-5 py-3 rounded-xl bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-medium"
-                >
-                  Revoke Access
-                </button>
+                {selectedBooking.status === "revoked" ? (
+                  <button
+                    onClick={() => handleGrantAccess(selectedBooking)}
+                    className="px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 font-medium"
+                  >
+                    Grant Access
+                  </button>
+                ) : (
+                  <button
+                    onClick={() =>
+                      updateBookingStatus(selectedBooking.id, "revoked")
+                    }
+                    disabled={
+                      selectedBooking.status === "completed" ||
+                      selectedBooking.keyDispensed
+                    }
+                    className="px-5 py-3 rounded-xl bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Revoke Access
+                  </button>
+                )}
 
                 <button
                   onClick={() => setSelectedBooking(null)}

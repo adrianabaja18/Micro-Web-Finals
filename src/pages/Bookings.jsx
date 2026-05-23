@@ -5,6 +5,7 @@ import {
   deleteBooking,
   listenBookings,
   updateBookingStatus,
+  overrideDispenseKey,
 } from "../firebase/services";
 import {
   X,
@@ -21,6 +22,8 @@ export default function Bookings() {
   const [createdQR, setCreatedQR] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [overrideMessage, setOverrideMessage] = useState("");
 
   const [form, setForm] = useState({
     guestName: "",
@@ -73,30 +76,50 @@ export default function Bookings() {
     }, 1500);
   };
 
+  const handleOverrideDispense = async (booking) => {
+    const confirmed = window.confirm(
+      `Manual override will dispense ${booking.keyId} for ${booking.guestName} without QR validation. Continue?`,
+    );
+
+    if (!confirmed) return;
+
+    setOverrideLoading(true);
+    setOverrideMessage("");
+
+    try {
+      const result = await overrideDispenseKey(booking);
+      setOverrideMessage(result.message);
+    } catch (error) {
+      setOverrideMessage(error.message);
+    } finally {
+      setOverrideLoading(false);
+    }
+  };
+
   const handleDownloadQR = (canvasId, guestName = "guest") => {
-  const canvas = document.getElementById(canvasId);
+    const canvas = document.getElementById(canvasId);
 
-  if (!canvas) {
-    alert("QR code not found.");
-    return;
-  }
+    if (!canvas) {
+      alert("QR code not found.");
+      return;
+    }
 
-  const pngUrl = canvas
-    .toDataURL("image/png")
-    .replace("image/png", "image/octet-stream");
+    const pngUrl = canvas
+      .toDataURL("image/png")
+      .replace("image/png", "image/octet-stream");
 
-  const safeGuestName = guestName
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "-")
-    .replace(/-+/g, "-");
+    const safeGuestName = guestName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-");
 
-  const downloadLink = document.createElement("a");
-  downloadLink.href = pngUrl;
-  downloadLink.download = `${safeGuestName}-qr-code.png`;
-  document.body.appendChild(downloadLink);
-  downloadLink.click();
-  document.body.removeChild(downloadLink);
-};
+    const downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `${safeGuestName}-qr-code.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
 
   const formatDateTime = (dateValue) => {
     if (!dateValue) return "-";
@@ -211,7 +234,11 @@ export default function Bookings() {
 
               <div className="flex flex-col md:flex-row gap-6 items-center">
                 <div className="bg-white p-4 rounded-xl border">
-                  <QRCodeCanvas id="created-booking-qr" value={createdQR.qrToken} size={180} />
+                  <QRCodeCanvas
+                    id="created-booking-qr"
+                    value={createdQR.qrToken}
+                    size={180}
+                  />
                 </div>
 
                 <div className="w-full">
@@ -233,16 +260,17 @@ export default function Bookings() {
                   </div>
 
                   {copied && (
-                    <p className="text-sm text-green-600 mt-2">
-                      Token copied.
-                    </p>
+                    <p className="text-sm text-green-600 mt-2">Token copied.</p>
                   )}
                   <button
-                  onClick={() =>
-                    handleDownloadQR("created-booking-qr", createdQR.guestName)
-                  }
-                  className="mt-3 inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
-                  type="button"
+                    onClick={() =>
+                      handleDownloadQR(
+                        "created-booking-qr",
+                        createdQR.guestName,
+                      )
+                    }
+                    className="mt-3 inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                    type="button"
                   >
                     <Download size={18} />
                     Download QR Code
@@ -287,7 +315,7 @@ export default function Bookings() {
                     <td>
                       <span
                         className={`px-3 py-1 rounded-full text-xs ${getStatusStyle(
-                          booking.status
+                          booking.status,
                         )}`}
                       >
                         {booking.status}
@@ -361,7 +389,10 @@ export default function Bookings() {
                 </div>
 
                 <DetailItem label="Contact" value={selectedBooking.contact} />
-                <DetailItem label="Property / Unit" value={selectedBooking.property} />
+                <DetailItem
+                  label="Property / Unit"
+                  value={selectedBooking.property}
+                />
 
                 <div className="flex items-center gap-3">
                   <KeyRound className="text-slate-600" />
@@ -390,7 +421,7 @@ export default function Bookings() {
                   <p className="text-sm text-slate-500">Status</p>
                   <span
                     className={`inline-flex mt-1 px-3 py-1 rounded-full text-xs ${getStatusStyle(
-                      selectedBooking.status
+                      selectedBooking.status,
                     )}`}
                   >
                     {selectedBooking.status}
@@ -406,6 +437,10 @@ export default function Bookings() {
                     label="Key Returned"
                     value={selectedBooking.keyReturned ? "Yes" : "No"}
                   />
+                  <StatusBox
+                    label="Override Used"
+                    value={selectedBooking.overrideUsed ? "Yes" : "No"}
+                  />
                 </div>
               </div>
 
@@ -417,10 +452,11 @@ export default function Bookings() {
 
                 <div className="flex justify-center">
                   <div className="bg-white p-4 rounded-2xl border border-slate-200">
-                    <QRCodeCanvas 
-                    id={`booking-qr-${selectedBooking.id}`} 
-                    value={selectedBooking.qrToken} 
-                    size={220} />
+                    <QRCodeCanvas
+                      id={`booking-qr-${selectedBooking.id}`}
+                      value={selectedBooking.qrToken}
+                      size={220}
+                    />
                   </div>
                 </div>
 
@@ -445,19 +481,19 @@ export default function Bookings() {
                       QR token copied.
                     </p>
                   )}
-                   <button
+                  <button
                     onClick={() =>
                       handleDownloadQR(
                         `booking-qr-${selectedBooking.id}`,
-                        selectedBooking.guestName
+                        selectedBooking.guestName,
                       )
                     }
                     className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
                     type="button"
-                    >
-                      <Download size={18} />
-                      Download QR Code
-                    </button>
+                  >
+                    <Download size={18} />
+                    Download QR Code
+                  </button>
                 </div>
 
                 <div className="mt-5 p-4 rounded-xl bg-blue-50 text-blue-700 text-sm">
@@ -467,20 +503,43 @@ export default function Bookings() {
               </div>
             </div>
 
-            <div className="border-t border-slate-200 px-6 py-4 flex flex-col md:flex-row gap-3 justify-end">
-              <button
-                onClick={() => updateBookingStatus(selectedBooking.id, "revoked")}
-                className="px-5 py-3 rounded-xl bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-medium"
-              >
-                Revoke Access
-              </button>
+            <div className="border-t border-slate-200 px-6 py-4">
+              {overrideMessage && (
+                <div className="mb-4 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm">
+                  {overrideMessage}
+                </div>
+              )}
 
-              <button
-                onClick={() => setSelectedBooking(null)}
-                className="px-5 py-3 rounded-xl bg-slate-950 text-white hover:bg-slate-800 font-medium"
-              >
-                Close
-              </button>
+              <div className="flex flex-col md:flex-row gap-3 justify-end">
+                <button
+                  onClick={() => handleOverrideDispense(selectedBooking)}
+                  disabled={
+                    overrideLoading ||
+                    selectedBooking.keyDispensed ||
+                    selectedBooking.status === "completed" ||
+                    selectedBooking.status === "revoked"
+                  }
+                  className="px-5 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50"
+                >
+                  {overrideLoading ? "Processing..." : "Override Dispense Key"}
+                </button>
+
+                <button
+                  onClick={() =>
+                    updateBookingStatus(selectedBooking.id, "revoked")
+                  }
+                  className="px-5 py-3 rounded-xl bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-medium"
+                >
+                  Revoke Access
+                </button>
+
+                <button
+                  onClick={() => setSelectedBooking(null)}
+                  className="px-5 py-3 rounded-xl bg-slate-950 text-white hover:bg-slate-800 font-medium"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

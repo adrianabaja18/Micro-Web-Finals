@@ -429,6 +429,115 @@ export async function simulateKeyDispense(booking) {
   });
 }
 
+export async function overrideDispenseKey(booking) {
+  if (!booking?.id || !booking?.keyId) {
+    throw new Error("Missing booking or key information.");
+  }
+
+  const keyQuery = query(
+    collection(db, "keys"),
+    where("__name__", "==", booking.keyId)
+  );
+
+  const keySnapshot = await getDocs(keyQuery);
+
+  if (keySnapshot.empty) {
+    await addLog({
+      eventType: "OVERRIDE_FAILED",
+      message: `Manual override failed. Assigned key ${booking.keyId} does not exist.`,
+      bookingId: booking.id,
+      keyId: booking.keyId,
+      guestName: booking.guestName,
+    });
+
+    throw new Error("Assigned key does not exist.");
+  }
+
+  const key = {
+    id: keySnapshot.docs[0].id,
+    ...keySnapshot.docs[0].data(),
+  };
+
+  if (key.status !== "available") {
+    await addLog({
+      eventType: "OVERRIDE_FAILED",
+      message: `Manual override failed. ${booking.keyId} is currently ${key.status}.`,
+      bookingId: booking.id,
+      keyId: booking.keyId,
+      guestName: booking.guestName,
+    });
+
+    throw new Error(
+      `Cannot override. ${booking.keyId} is currently ${key.status}.`
+    );
+  }
+
+  await updateDoc(doc(db, "bookings", booking.id), {
+    keyDispensed: true,
+    keyReturned: false,
+    status: "in_use",
+    dispensedAt: serverTimestamp(),
+    overrideUsed: true,
+    overrideAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await updateDoc(doc(db, "keys", booking.keyId), {
+    status: "dispensed",
+    currentBookingId: booking.id,
+    lastDispensedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await addDoc(collection(db, "commands"), {
+    deviceId: "DEVICE_001",
+    command: "OVERRIDE_DISPENSE_KEY",
+    payload: {
+      bookingId: booking.id,
+      keyId: booking.keyId,
+      guestName: booking.guestName || "",
+      reason: "Host manually approved renter access.",
+    },
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
+
+  await addLog({
+    eventType: "OVERRIDE_COMMAND_SENT",
+    message: `Override command sent to device for ${booking.keyId}.`,
+    bookingId: booking.id,
+    keyId: booking.keyId,
+    guestName: booking.guestName,
+  });
+
+  await addLog({
+    eventType: "MANUAL_OVERRIDE_DISPENSE",
+    message: `Host manually dispensed ${booking.keyId} for ${booking.guestName}.`,
+    bookingId: booking.id,
+    keyId: booking.keyId,
+    guestName: booking.guestName,
+  });
+
+  await addNotification({
+    title: "Manual Override Used",
+    message: `${booking.keyId} was manually dispensed for ${booking.guestName}.`,
+    type: "warning",
+  });
+
+  await updateDeviceStatus({
+    currentMode: "manual_override",
+    motorStatus: "override_dispense_pending",
+    lcdMessage: "Override Dispense",
+    lastScannedQr: "MANUAL_OVERRIDE",
+  });
+
+  return {
+    success: true,
+    code: "OVERRIDE_DISPENSED",
+    message: `${booking.keyId} was manually dispensed for ${booking.guestName}.`,
+  };
+}
+
 // =====================
 // RFID RETURN VERIFICATION
 // =====================

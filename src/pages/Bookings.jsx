@@ -6,10 +6,13 @@ import {
   listenBookings,
   updateBookingStatus,
 } from "../firebase/services";
+import { X, Copy, QrCode, CalendarDays, KeyRound, User } from "lucide-react";
 
 export default function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [createdQR, setCreatedQR] = useState(null);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const [form, setForm] = useState({
     guestName: "",
@@ -53,6 +56,40 @@ export default function Bookings() {
     });
   };
 
+  const handleCopyToken = async (token) => {
+    await navigator.clipboard.writeText(token);
+    setCopied(true);
+
+    setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+  };
+
+  const formatDateTime = (dateValue) => {
+    if (!dateValue) return "-";
+
+    try {
+      return new Date(dateValue).toLocaleString();
+    } catch {
+      return dateValue;
+    }
+  };
+
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-700";
+      case "in_use":
+        return "bg-blue-100 text-blue-700";
+      case "completed":
+        return "bg-slate-100 text-slate-700";
+      case "revoked":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -74,7 +111,7 @@ export default function Bookings() {
             value={form.guestName}
             onChange={handleChange}
             placeholder="Guest name"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             required
           />
 
@@ -83,7 +120,7 @@ export default function Bookings() {
             value={form.contact}
             onChange={handleChange}
             placeholder="Contact number/email"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             required
           />
 
@@ -92,7 +129,7 @@ export default function Bookings() {
             value={form.property}
             onChange={handleChange}
             placeholder="Property / Room / Unit"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             required
           />
 
@@ -101,7 +138,7 @@ export default function Bookings() {
             value={form.keyId}
             onChange={handleChange}
             placeholder="Key ID"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             required
           />
 
@@ -112,7 +149,7 @@ export default function Bookings() {
               value={form.accessStart}
               onChange={handleChange}
               type="datetime-local"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3"
+              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
               required
             />
           </div>
@@ -124,7 +161,7 @@ export default function Bookings() {
               value={form.accessEnd}
               onChange={handleChange}
               type="datetime-local"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3"
+              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
               required
             />
           </div>
@@ -144,21 +181,43 @@ export default function Bookings() {
                   <QRCodeCanvas value={createdQR.qrToken} size={180} />
                 </div>
 
-                <div>
+                <div className="w-full">
                   <p className="text-sm text-slate-500">Guest</p>
                   <p className="font-bold">{createdQR.guestName}</p>
 
                   <p className="text-sm text-slate-500 mt-3">QR Token</p>
-                  <p className="font-mono text-sm break-all bg-slate-100 p-3 rounded-xl">
-                    {createdQR.qrToken}
-                  </p>
+                  <div className="flex gap-2 mt-1">
+                    <p className="font-mono text-sm break-all bg-slate-100 p-3 rounded-xl flex-1">
+                      {createdQR.qrToken}
+                    </p>
+                    <button
+                      onClick={() => handleCopyToken(createdQR.qrToken)}
+                      className="px-4 rounded-xl bg-slate-950 text-white"
+                      type="button"
+                    >
+                      <Copy size={18} />
+                    </button>
+                  </div>
+
+                  {copied && (
+                    <p className="text-sm text-green-600 mt-2">
+                      Token copied.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm overflow-x-auto">
-            <h2 className="text-lg font-bold mb-4">Booking List</h2>
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold">Booking List</h2>
+                <p className="text-sm text-slate-500">
+                  Click a booking row to view full details and QR code.
+                </p>
+              </div>
+            </div>
 
             <table className="w-full text-sm">
               <thead>
@@ -174,28 +233,41 @@ export default function Bookings() {
 
               <tbody>
                 {bookings.map((booking) => (
-                  <tr key={booking.id} className="border-b">
+                  <tr
+                    key={booking.id}
+                    onClick={() => setSelectedBooking(booking)}
+                    className="border-b hover:bg-slate-50 cursor-pointer transition"
+                  >
                     <td className="py-3 font-medium">{booking.guestName}</td>
                     <td>{booking.property}</td>
                     <td>{booking.keyId}</td>
                     <td>
-                      <span className="px-3 py-1 rounded-full bg-slate-100 text-xs">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs ${getStatusStyle(
+                          booking.status
+                        )}`}
+                      >
                         {booking.status}
                       </span>
                     </td>
                     <td className="font-mono max-w-[180px] truncate">
                       {booking.qrToken}
                     </td>
-                    <td className="flex gap-2 py-2">
+                    <td
+                      className="flex gap-2 py-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
-                        onClick={() => updateBookingStatus(booking.id, "revoked")}
-                        className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700"
+                        onClick={() =>
+                          updateBookingStatus(booking.id, "revoked")
+                        }
+                        className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
                       >
                         Revoke
                       </button>
                       <button
                         onClick={() => deleteBooking(booking.id)}
-                        className="px-3 py-2 rounded-lg bg-red-100 text-red-700"
+                        className="px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
                       >
                         Delete
                       </button>
@@ -215,6 +287,163 @@ export default function Bookings() {
           </div>
         </div>
       </div>
+
+      {selectedBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+              <div>
+                <h2 className="text-xl font-bold">Booking Details</h2>
+                <p className="text-sm text-slate-500">
+                  View or resend the renter’s QR access code.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="h-10 w-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 grid lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <User className="text-slate-600" />
+                  <div>
+                    <p className="text-sm text-slate-500">Guest Name</p>
+                    <p className="font-bold">{selectedBooking.guestName}</p>
+                  </div>
+                </div>
+
+                <DetailItem label="Contact" value={selectedBooking.contact} />
+                <DetailItem label="Property / Unit" value={selectedBooking.property} />
+
+                <div className="flex items-center gap-3">
+                  <KeyRound className="text-slate-600" />
+                  <div>
+                    <p className="text-sm text-slate-500">Assigned Key</p>
+                    <p className="font-bold">{selectedBooking.keyId}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <CalendarDays className="text-slate-600" />
+                  <div>
+                    <p className="text-sm text-slate-500">Access Period</p>
+                    <p className="font-medium">
+                      {formatDateTime(selectedBooking.accessStart)}
+                    </p>
+                    <p className="font-medium">
+                      to {formatDateTime(selectedBooking.accessEnd)}
+                    </p>
+                  </div>
+                </div>
+
+                <DetailItem label="Booking ID" value={selectedBooking.id} />
+
+                <div>
+                  <p className="text-sm text-slate-500">Status</p>
+                  <span
+                    className={`inline-flex mt-1 px-3 py-1 rounded-full text-xs ${getStatusStyle(
+                      selectedBooking.status
+                    )}`}
+                  >
+                    {selectedBooking.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <StatusBox
+                    label="Key Dispensed"
+                    value={selectedBooking.keyDispensed ? "Yes" : "No"}
+                  />
+                  <StatusBox
+                    label="Key Returned"
+                    value={selectedBooking.keyReturned ? "Yes" : "No"}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <QrCode className="text-slate-700" />
+                  <h3 className="font-bold">QR Access Code</h3>
+                </div>
+
+                <div className="flex justify-center">
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <QRCodeCanvas value={selectedBooking.qrToken} size={220} />
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <p className="text-sm text-slate-500 mb-1">Full QR Token</p>
+                  <div className="flex gap-2">
+                    <p className="font-mono text-sm break-all bg-white border border-slate-200 p-3 rounded-xl flex-1">
+                      {selectedBooking.qrToken}
+                    </p>
+
+                    <button
+                      onClick={() => handleCopyToken(selectedBooking.qrToken)}
+                      className="px-4 rounded-xl bg-slate-950 text-white hover:bg-slate-800"
+                      title="Copy token"
+                    >
+                      <Copy size={18} />
+                    </button>
+                  </div>
+
+                  {copied && (
+                    <p className="text-sm text-green-600 mt-2">
+                      QR token copied.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-5 p-4 rounded-xl bg-blue-50 text-blue-700 text-sm">
+                  The host can show this QR code to the renter again if the
+                  original QR was lost.
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 px-6 py-4 flex flex-col md:flex-row gap-3 justify-end">
+              <button
+                onClick={() => updateBookingStatus(selectedBooking.id, "revoked")}
+                className="px-5 py-3 rounded-xl bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-medium"
+              >
+                Revoke Access
+              </button>
+
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="px-5 py-3 rounded-xl bg-slate-950 text-white hover:bg-slate-800 font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div>
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="font-medium break-all">{value || "-"}</p>
+    </div>
+  );
+}
+
+function StatusBox({ label, value }) {
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="font-bold">{value}</p>
     </div>
   );
 }

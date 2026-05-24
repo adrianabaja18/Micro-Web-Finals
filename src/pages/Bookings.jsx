@@ -555,14 +555,25 @@ export default function Bookings() {
                     <td className="py-3 font-medium">{booking.guestName}</td>
                     <td>{booking.property}</td>
                     <td>{booking.keyId}</td>
-                    <td>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs ${getStatusStyle(
-                          booking.status,
-                        )}`}
-                      >
-                        {booking.status}
-                      </span>
+                    <td className="py-3 align-top">
+                      <div className="inline-flex items-center gap-2 text-sm">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            booking.status === "active"
+                              ? "bg-green-500"
+                              : booking.status === "revoked"
+                                ? "bg-red-500"
+                                : booking.status === "in_use"
+                                  ? "bg-blue-500"
+                                  : booking.status === "completed"
+                                    ? "bg-slate-400"
+                                    : "bg-yellow-500"
+                          }`}
+                        />
+                        <span className="capitalize text-slate-700">
+                          {booking.status}
+                        </span>
+                      </div>
                     </td>
 
                     <td>
@@ -571,14 +582,24 @@ export default function Bookings() {
 
                         return (
                           <div>
-                            <span
-                              className={`inline-flex px-3 py-1 rounded-full text-xs ${validity.color}`}
-                            >
-                              {validity.label}
-                            </span>
-                            <p className="text-xs text-slate-500 mt-1">
-                              {validity.detail}
-                            </p>
+                            <td className="py-3 align-top">
+                              {(() => {
+                                const validity = getQrValidityInfo(booking);
+
+                                return (
+                                  <div className="space-y-1">
+                                    <span
+                                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${validity.color}`}
+                                    >
+                                      {validity.label}
+                                    </span>
+                                    <p className="text-[11px] leading-tight text-slate-500">
+                                      {validity.detail}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
+                            </td>
                           </div>
                         );
                       })()}

@@ -271,12 +271,13 @@ export default function Bookings() {
 
   const filteredBookings = bookings.filter((booking) => {
     const query = searchQuery.toLowerCase();
+
     return (
-      booking.guestName.toLowerCase().includes(query) ||
-      booking.property.toLowerCase().includes(query) ||
-      booking.keyId.toLowerCase().includes(query) ||
-      booking.status.toLowerCase().includes(query) ||
-      booking.contact.toLowerCase().includes(query)
+      (booking.guestName || "").toLowerCase().includes(query) ||
+      (booking.property || "").toLowerCase().includes(query) ||
+      (booking.keyId || "").toLowerCase().includes(query) ||
+      (booking.status || "").toLowerCase().includes(query) ||
+      (booking.contact || "").toLowerCase().includes(query)
     );
   });
 

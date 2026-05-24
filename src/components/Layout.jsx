@@ -9,6 +9,7 @@ import {
   Cpu,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import logo from "../assets/logo.png";
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -31,9 +32,16 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-slate-50">
       <aside className="fixed left-0 top-0 h-screen w-64 bg-slate-950 text-white p-5 hidden md:flex flex-col">
-        <div className="mb-8">
-          <h1 className="text-xl font-bold">Key Dispenser</h1>
-          <p className="text-sm text-slate-400">Host Control Panel</p>
+        <div className="mb-8 flex items-center gap-3">
+          <img
+            src={logo}
+            alt="Key Dispenser Logo"
+            className="h-10 w-10 rounded-xl object-cover"
+          />
+          <div>
+            <h1 className="text-xl font-bold">Key Dispenser</h1>
+            <p className="text-sm text-slate-400">Host Control Panel</p>
+          </div>
         </div>
 
         <nav className="space-y-2 flex-1">

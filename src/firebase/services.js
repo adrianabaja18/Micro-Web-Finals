@@ -10,6 +10,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
@@ -191,6 +192,62 @@ export function listenKeys(callback) {
 
     callback(sortByUpdatedAtDesc(data));
   });
+}
+
+export async function deleteKeyRecord(key) {
+  if (!key?.id) {
+    throw new Error("Missing key information.");
+  }
+
+  if (key.status === "dispensed" || key.currentBookingId) {
+    throw new Error(
+      "Cannot delete this key because it is currently dispensed or linked to an active booking.",
+    );
+  }
+
+  await deleteDoc(doc(db, "keys", key.id));
+
+  await addLog({
+    eventType: "KEY_DELETED",
+    message: `${key.id} was deleted from the key records.`,
+    keyId: key.id,
+  });
+
+  await addNotification({
+    title: "Key Deleted",
+    message: `${key.id} was deleted from the key records.`,
+    type: "warning",
+  });
+}
+
+export async function clearAccessLogs() {
+  const logsSnapshot = await getDocs(collection(db, "accessLogs"));
+
+  if (logsSnapshot.empty) {
+    return {
+      deletedCount: 0,
+      message: "No logs to clear.",
+    };
+  }
+
+  const batch = writeBatch(db);
+
+  logsSnapshot.docs.forEach((logDoc) => {
+    batch.delete(doc(db, "accessLogs", logDoc.id));
+  });
+
+  await batch.commit();
+
+  await addNotification({
+    title: "Logs Cleared",
+    message: `${logsSnapshot.size} access log(s) were cleared.`,
+    type: "warning",
+  });
+
+  return {
+    deletedCount: logsSnapshot.size,
+    message: `${logsSnapshot.size} access log(s) cleared successfully.`,
+  };
 }
 
 // =====================

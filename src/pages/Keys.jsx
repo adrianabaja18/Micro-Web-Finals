@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { createOrUpdateKey, listenKeys, updateKeyStatus } from "../firebase/services";
+import {
+  createOrUpdateKey,
+  deleteKeyRecord,
+  listenKeys,
+  updateKeyStatus,
+} from "../firebase/services";
+import { Trash2 } from "lucide-react";
 
 export default function Keys() {
   const [keys, setKeys] = useState([]);
+  const [message, setMessage] = useState("");
   const [form, setForm] = useState({
     keyId: "KEY_001",
     property: "",
@@ -24,20 +31,59 @@ export default function Keys() {
 
   const handleSaveKey = async (e) => {
     e.preventDefault();
+    setMessage("");
 
-    await createOrUpdateKey(form.keyId, {
-      property: form.property,
-      rfidUid: form.rfidUid,
-      status: form.status,
-      currentBookingId: null,
-    });
+    try {
+      await createOrUpdateKey(form.keyId, {
+        property: form.property,
+        rfidUid: form.rfidUid,
+        status: form.status,
+        currentBookingId: null,
+      });
 
-    setForm({
-      keyId: "KEY_001",
-      property: "",
-      rfidUid: "",
-      status: "available",
-    });
+      setMessage(`${form.keyId} saved successfully.`);
+
+      setForm({
+        keyId: "KEY_001",
+        property: "",
+        rfidUid: "",
+        status: "available",
+      });
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  const handleDeleteKey = async (key) => {
+    const confirmed = window.confirm(
+      `Delete ${key.id}? This will remove the key record from the system.`,
+    );
+
+    if (!confirmed) return;
+
+    setMessage("");
+
+    try {
+      await deleteKeyRecord(key);
+      setMessage(`${key.id} deleted successfully.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "available":
+        return "bg-green-100 text-green-700";
+      case "dispensed":
+        return "bg-blue-100 text-blue-700";
+      case "maintenance":
+        return "bg-yellow-100 text-yellow-700";
+      case "missing":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
   };
 
   return (
@@ -48,6 +94,12 @@ export default function Keys() {
           Register RFID-tagged keys and monitor their status.
         </p>
       </div>
+
+      {message && (
+        <div className="mb-5 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm">
+          {message}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <form
@@ -110,7 +162,7 @@ export default function Keys() {
                 <th>Property</th>
                 <th>RFID UID</th>
                 <th>Status</th>
-                <th>Update</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -121,23 +173,46 @@ export default function Keys() {
                   <td>{key.property}</td>
                   <td className="font-mono">{key.rfidUid}</td>
                   <td>
-                    <span className="px-3 py-1 rounded-full bg-slate-100 text-xs">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs ${getStatusStyle(
+                        key.status,
+                      )}`}
+                    >
                       {key.status}
                     </span>
                   </td>
-                  <td className="flex gap-2 py-2">
-                    <button
-                      onClick={() => updateKeyStatus(key.id, "available")}
-                      className="px-3 py-2 rounded-lg bg-green-100 text-green-700"
-                    >
-                      Available
-                    </button>
-                    <button
-                      onClick={() => updateKeyStatus(key.id, "dispensed")}
-                      className="px-3 py-2 rounded-lg bg-blue-100 text-blue-700"
-                    >
-                      Dispensed
-                    </button>
+                  <td className="py-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => updateKeyStatus(key.id, "available")}
+                        className="px-3 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200"
+                      >
+                        Available
+                      </button>
+
+                      <button
+                        onClick={() => updateKeyStatus(key.id, "dispensed")}
+                        className="px-3 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        Dispensed
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteKey(key)}
+                        disabled={
+                          key.status === "dispensed" || key.currentBookingId
+                        }
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={
+                          key.status === "dispensed" || key.currentBookingId
+                            ? "Cannot delete a key that is currently dispensed or linked to a booking."
+                            : "Delete key"
+                        }
+                      >
+                        <Trash2 size={16} />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -151,6 +226,11 @@ export default function Keys() {
               )}
             </tbody>
           </table>
+
+          <p className="text-xs text-slate-500 mt-4">
+            Note: A key cannot be deleted while it is dispensed or linked to an
+            active booking.
+          </p>
         </div>
       </div>
     </div>

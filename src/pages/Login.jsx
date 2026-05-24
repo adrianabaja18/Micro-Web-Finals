@@ -58,7 +58,9 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-700">Password</label>
+            <label className="text-sm font-medium text-slate-700">
+              Password
+            </label>
             <input
               className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
               value={password}

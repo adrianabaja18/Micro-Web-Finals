@@ -801,6 +801,30 @@ export async function markNotificationRead(notificationId) {
   });
 }
 
+export async function clearNotifications() {
+  const notificationsSnapshot = await getDocs(collection(db, "notifications"));
+
+  if (notificationsSnapshot.empty) {
+    return {
+      deletedCount: 0,
+      message: "No notifications to clear.",
+    };
+  }
+
+  const batch = writeBatch(db);
+
+  notificationsSnapshot.docs.forEach((notificationDoc) => {
+    batch.delete(doc(db, "notifications", notificationDoc.id));
+  });
+
+  await batch.commit();
+
+  return {
+    deletedCount: notificationsSnapshot.size,
+    message: `${notificationsSnapshot.size} notification(s) cleared successfully.`,
+  };
+}
+
 // =====================
 // DEVICE
 // =====================

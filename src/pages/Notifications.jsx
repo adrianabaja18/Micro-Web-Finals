@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { listenNotifications, markNotificationRead } from "../firebase/services";
+import {
+  clearNotifications,
+  listenNotifications,
+  markNotificationRead,
+} from "../firebase/services";
+import { CheckCheck, Trash2 } from "lucide-react";
 
 const formatDate = (timestamp) => {
   if (!timestamp?.toDate) return "Pending...";
@@ -8,7 +13,9 @@ const formatDate = (timestamp) => {
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
-  const [filterStatus, setFilterStatus] = useState("all"); // "all", "read", "unread"
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [clearMessage, setClearMessage] = useState("");
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = listenNotifications(setNotifications);
@@ -30,14 +37,62 @@ export default function Notifications() {
     return true;
   });
 
+  const handleClearNotifications = async () => {
+    const confirmed = window.confirm(
+      "Clear all notifications? This action cannot be undone.",
+    );
+
+    if (!confirmed) return;
+
+    setIsClearing(true);
+    setClearMessage("");
+
+    try {
+      const result = await clearNotifications();
+      setClearMessage(result.message);
+    } catch (error) {
+      setClearMessage(error.message);
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Notifications</h1>
-        <p className="text-slate-500">
-          Host alerts for key release, return, and invalid access.
-        </p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Notifications</h1>
+          <p className="text-slate-500">
+            Host alerts for key release, return, and invalid access.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleMarkAllAsRead}
+            disabled={notifications.every((notif) => notif.read)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-950 text-white hover:bg-slate-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <CheckCheck size={18} />
+            Mark All as Read
+          </button>
+
+          <button
+            onClick={handleClearNotifications}
+            disabled={isClearing || notifications.length === 0}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 size={18} />
+            {isClearing ? "Clearing..." : "Clear Notifications"}
+          </button>
+        </div>
       </div>
+
+      {clearMessage && (
+        <div className="mb-5 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm">
+          {clearMessage}
+        </div>
+      )}
 
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-wrap gap-2">
@@ -72,15 +127,6 @@ export default function Notifications() {
             Read
           </button>
         </div>
-
-        {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllAsRead}
-            className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium transition"
-          >
-            Mark all as read
-          </button>
-        )}
       </div>
 
       <div className="space-y-4">

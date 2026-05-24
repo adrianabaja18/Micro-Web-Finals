@@ -6,6 +6,7 @@ import {
   listenBookings,
   updateBookingStatus,
   overrideDispenseKey,
+  updateBookingAccessWindow,
 } from "../firebase/services";
 import {
   X,
@@ -25,6 +26,13 @@ export default function Bookings() {
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [overrideMessage, setOverrideMessage] = useState("");
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [editingAccessTime, setEditingAccessTime] = useState(false);
+  const [accessTimeForm, setAccessTimeForm] = useState({
+    accessStart: "",
+    accessEnd: "",
+  });
+
   const [form, setForm] = useState({
     guestName: "",
     contact: "",
@@ -37,6 +45,14 @@ export default function Bookings() {
   useEffect(() => {
     const unsubscribe = listenBookings(setBookings);
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   const handleChange = (e) => {
@@ -68,19 +84,19 @@ export default function Bookings() {
   };
 
   const handleGrantAccess = async (booking) => {
-  const confirmed = window.confirm(
-    `Grant access again for ${booking.guestName}? This will reactivate the booking.`
-  );
+    const confirmed = window.confirm(
+      `Grant access again for ${booking.guestName}? This will reactivate the booking.`,
+    );
 
-  if (!confirmed) return;
+    if (!confirmed) return;
 
-  try {
-    await updateBookingStatus(booking.id, "active");
-    setOverrideMessage("Booking access has been granted again.");
-  } catch (error) {
-    setOverrideMessage(error.message);
-  }
-};
+    try {
+      await updateBookingStatus(booking.id, "active");
+      setOverrideMessage("Booking access has been granted again.");
+    } catch (error) {
+      setOverrideMessage(error.message);
+    }
+  };
 
   const handleCopyToken = async (token) => {
     await navigator.clipboard.writeText(token);
@@ -158,6 +174,186 @@ export default function Bookings() {
         return "bg-red-100 text-red-700";
       default:
         return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const getQrValidityInfo = (booking) => {
+    if (!booking) {
+      return {
+        label: "Unknown",
+        detail: "-",
+        color: "bg-slate-100 text-slate-700",
+      };
+    }
+
+    if (booking.status === "revoked") {
+      return {
+        label: "Revoked",
+        detail: "Access disabled",
+        color: "bg-red-100 text-red-700",
+      };
+    }
+
+    if (booking.status === "completed") {
+      return {
+        label: "Completed",
+        detail: "Key already returned",
+        color: "bg-slate-100 text-slate-700",
+      };
+    }
+
+    if (booking.status === "in_use" || booking.keyDispensed) {
+      return {
+        label: "In Use",
+        detail: "Key already dispensed",
+        color: "bg-blue-100 text-blue-700",
+      };
+    }
+
+    const start = new Date(booking.accessStart);
+    const end = new Date(booking.accessEnd);
+    const now = currentTime;
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return {
+        label: "Invalid Time",
+        detail: "Check access dates",
+        color: "bg-yellow-100 text-yellow-700",
+      };
+    }
+
+    if (now < start) {
+      return {
+        label: "Not Yet Valid",
+        detail: `Starts in ${formatDuration(start - now)}`,
+        color: "bg-yellow-100 text-yellow-700",
+      };
+    }
+
+    if (now > end) {
+      return {
+        label: "Expired",
+        detail: "QR validity ended",
+        color: "bg-red-100 text-red-700",
+      };
+    }
+
+    return {
+      label: "Valid Now",
+      detail: `Expires in ${formatDuration(end - now)}`,
+      color: "bg-green-100 text-green-700",
+    };
+  };
+
+  const formatDuration = (milliseconds) => {
+    const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`;
+    }
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    }
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+
+    return `${seconds}s`;
+  };
+
+  const toDatetimeLocalValue = (value) => {
+    if (!value) return "";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60 * 1000);
+
+    return localDate.toISOString().slice(0, 16);
+  };
+
+  const openAccessTimeEditor = (booking) => {
+    setAccessTimeForm({
+      accessStart: toDatetimeLocalValue(booking.accessStart),
+      accessEnd: toDatetimeLocalValue(booking.accessEnd),
+    });
+
+    setEditingAccessTime(true);
+    setOverrideMessage("");
+  };
+
+  const handleAccessTimeChange = (e) => {
+    setAccessTimeForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleSaveAccessTime = async () => {
+    if (!selectedBooking) return;
+
+    if (!accessTimeForm.accessStart || !accessTimeForm.accessEnd) {
+      setOverrideMessage("Please provide both access start and access end.");
+      return;
+    }
+
+    const start = new Date(accessTimeForm.accessStart);
+    const end = new Date(accessTimeForm.accessEnd);
+
+    if (end <= start) {
+      setOverrideMessage("Access end must be later than access start.");
+      return;
+    }
+
+    try {
+      await updateBookingAccessWindow(
+        selectedBooking.id,
+        accessTimeForm.accessStart,
+        accessTimeForm.accessEnd,
+      );
+
+      setOverrideMessage("QR validity period updated successfully.");
+      setEditingAccessTime(false);
+    } catch (error) {
+      setOverrideMessage(error.message);
+    }
+  };
+
+  const handleExtendAccess = async (booking, amount, unit) => {
+    if (!booking) return;
+
+    const currentEnd = new Date(booking.accessEnd);
+    const baseDate =
+      currentEnd > currentTime ? currentEnd : new Date(currentTime.getTime());
+
+    if (unit === "hours") {
+      baseDate.setHours(baseDate.getHours() + amount);
+    }
+
+    if (unit === "days") {
+      baseDate.setDate(baseDate.getDate() + amount);
+    }
+
+    const newAccessEnd = toDatetimeLocalValue(baseDate);
+
+    try {
+      await updateBookingAccessWindow(
+        booking.id,
+        booking.accessStart,
+        newAccessEnd,
+      );
+
+      setOverrideMessage(`QR validity extended by ${amount} ${unit}.`);
+    } catch (error) {
+      setOverrideMessage(error.message);
     }
   };
 
@@ -312,6 +508,7 @@ export default function Bookings() {
                   <th>Property</th>
                   <th>Key</th>
                   <th>Status</th>
+                  <th>QR Validity</th>
                   <th>QR Token</th>
                   <th>Action</th>
                 </tr>
@@ -321,7 +518,11 @@ export default function Bookings() {
                 {bookings.map((booking) => (
                   <tr
                     key={booking.id}
-                    onClick={() => setSelectedBooking(booking)}
+                    onClick={() => {
+                      setSelectedBooking(booking);
+                      setEditingAccessTime(false);
+                      setOverrideMessage("");
+                    }}
                     className="border-b hover:bg-slate-50 cursor-pointer transition"
                   >
                     <td className="py-3 font-medium">{booking.guestName}</td>
@@ -335,6 +536,29 @@ export default function Bookings() {
                       >
                         {booking.status}
                       </span>
+                    </td>
+
+                    <td>
+                      {(() => {
+                        const validity = getQrValidityInfo(booking);
+
+                        return (
+                          <div>
+                            <span
+                              className={`inline-flex px-3 py-1 rounded-full text-xs ${validity.color}`}
+                            >
+                              {validity.label}
+                            </span>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {validity.detail}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
+                    <td className="font-mono max-w-[180px] truncate">
+                      {booking.qrToken}
                     </td>
                     <td className="font-mono max-w-[180px] truncate">
                       {booking.qrToken}
@@ -363,7 +587,7 @@ export default function Bookings() {
 
                 {bookings.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="py-6 text-center text-slate-500">
+                    <td colSpan="7" className="py-6 text-center text-slate-500">
                       No bookings yet.
                     </td>
                   </tr>
@@ -386,7 +610,11 @@ export default function Bookings() {
               </div>
 
               <button
-                onClick={() => setSelectedBooking(null)}
+                onClick={() => {
+                  setSelectedBooking(null);
+                  setEditingAccessTime(false);
+                  setOverrideMessage("");
+                }}
                 className="h-10 w-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
               >
                 <X size={20} />
@@ -430,7 +658,134 @@ export default function Bookings() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold">QR Expiration Control</h3>
+                      <p className="text-sm text-slate-500">
+                        Edit or extend the renter's QR validity period.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => openAccessTimeEditor(selectedBooking)}
+                      className="px-4 py-2 rounded-xl bg-slate-950 text-white hover:bg-slate-800 text-sm font-medium"
+                    >
+                      Edit Time
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mt-4">
+                    <button
+                      onClick={() =>
+                        handleExtendAccess(selectedBooking, 1, "hours")
+                      }
+                      disabled={
+                        selectedBooking.status === "completed" ||
+                        selectedBooking.status === "in_use" ||
+                        selectedBooking.keyDispensed
+                      }
+                      className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +1 hour
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleExtendAccess(selectedBooking, 6, "hours")
+                      }
+                      disabled={
+                        selectedBooking.status === "completed" ||
+                        selectedBooking.status === "in_use" ||
+                        selectedBooking.keyDispensed
+                      }
+                      className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +6 hours
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleExtendAccess(selectedBooking, 1, "days")
+                      }
+                      disabled={
+                        selectedBooking.status === "completed" ||
+                        selectedBooking.status === "in_use" ||
+                        selectedBooking.keyDispensed
+                      }
+                      className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +1 day
+                    </button>
+                  </div>
+
+                  {editingAccessTime && (
+                    <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+                      <div>
+                        <label className="text-sm text-slate-600">
+                          Access Start
+                        </label>
+                        <input
+                          name="accessStart"
+                          value={accessTimeForm.accessStart}
+                          onChange={handleAccessTimeChange}
+                          type="datetime-local"
+                          className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-slate-600">
+                          Access End
+                        </label>
+                        <input
+                          name="accessEnd"
+                          value={accessTimeForm.accessEnd}
+                          onChange={handleAccessTimeChange}
+                          type="datetime-local"
+                          className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setEditingAccessTime(false)}
+                          className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          onClick={handleSaveAccessTime}
+                          className="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700"
+                        >
+                          Save Time
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <DetailItem label="Booking ID" value={selectedBooking.id} />
+                <div>
+                  <p className="text-sm text-slate-500">QR Validity</p>
+                  {(() => {
+                    const validity = getQrValidityInfo(selectedBooking);
+
+                    return (
+                      <div className="mt-1">
+                        <span
+                          className={`inline-flex px-3 py-1 rounded-full text-xs ${validity.color}`}
+                        >
+                          {validity.label}
+                        </span>
+                        <p className="text-sm text-slate-600 mt-1">
+                          {validity.detail}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 <div>
                   <p className="text-sm text-slate-500">Status</p>

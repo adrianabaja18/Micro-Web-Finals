@@ -91,6 +91,26 @@ export async function updateBookingStatus(bookingId, status) {
   });
 }
 
+export async function updateBookingAccessWindow(bookingId, accessStart, accessEnd) {
+  await updateDoc(doc(db, "bookings", bookingId), {
+    accessStart,
+    accessEnd,
+    updatedAt: serverTimestamp(),
+  });
+
+  await addLog({
+    eventType: "BOOKING_ACCESS_TIME_UPDATED",
+    message: "Booking QR validity period was updated.",
+    bookingId,
+  });
+
+  await addNotification({
+    title: "QR Validity Updated",
+    message: "A booking QR validity period was updated.",
+    type: "info",
+  });
+}
+
 export async function deleteBooking(bookingId) {
   await deleteDoc(doc(db, "bookings", bookingId));
 

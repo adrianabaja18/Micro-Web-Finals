@@ -91,7 +91,11 @@ export async function updateBookingStatus(bookingId, status) {
   });
 }
 
-export async function updateBookingAccessWindow(bookingId, accessStart, accessEnd) {
+export async function updateBookingAccessWindow(
+  bookingId,
+  accessStart,
+  accessEnd,
+) {
   await updateDoc(doc(db, "bookings", bookingId), {
     accessStart,
     accessEnd,
@@ -653,9 +657,9 @@ export async function verifyReturnedKey(rfidUid) {
   });
 
   await updateDeviceStatus({
-    currentMode: "return_accepted",
+    currentMode: "return_verified",
     lcdMessage: "Return Accepted",
-    motorStatus: "return_accepted",
+    returnStatus: "accepted",
     irDetected: false,
   });
 

@@ -16,10 +16,12 @@ import {
   KeyRound,
   User,
   Download,
+  Search,
 } from "lucide-react";
 
 export default function Bookings() {
   const [bookings, setBookings] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [createdQR, setCreatedQR] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -267,6 +269,17 @@ export default function Bookings() {
     return `${seconds}s`;
   };
 
+  const filteredBookings = bookings.filter((booking) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      booking.guestName.toLowerCase().includes(query) ||
+      booking.property.toLowerCase().includes(query) ||
+      booking.keyId.toLowerCase().includes(query) ||
+      booking.status.toLowerCase().includes(query) ||
+      booking.contact.toLowerCase().includes(query)
+    );
+  });
+
   const toDatetimeLocalValue = (value) => {
     if (!value) return "";
 
@@ -492,12 +505,22 @@ export default function Bookings() {
           )}
 
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm overflow-x-auto">
-            <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex flex-col gap-4 mb-4">
               <div>
                 <h2 className="text-lg font-bold">Booking List</h2>
                 <p className="text-sm text-slate-500">
                   Click a booking row to view full details and QR code.
                 </p>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search by guest name, property, key, status, or contact..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 outline-none"
+                />
               </div>
             </div>
 
@@ -515,7 +538,7 @@ export default function Bookings() {
               </thead>
 
               <tbody>
-                {bookings.map((booking) => (
+                {filteredBookings.map((booking) => (
                   <tr
                     key={booking.id}
                     onClick={() => {
@@ -585,10 +608,10 @@ export default function Bookings() {
                   </tr>
                 ))}
 
-                {bookings.length === 0 && (
+                {filteredBookings.length === 0 && (
                   <tr>
                     <td colSpan="7" className="py-6 text-center text-slate-500">
-                      No bookings yet.
+                      {searchQuery ? "No bookings match your search." : "No bookings yet."}
                     </td>
                   </tr>
                 )}
@@ -864,11 +887,6 @@ export default function Bookings() {
                     <Download size={18} />
                     Download QR Code
                   </button>
-                </div>
-
-                <div className="mt-5 p-4 rounded-xl bg-blue-50 text-blue-700 text-sm">
-                  The host can show this QR code to the renter again if the
-                  original QR was lost.
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listenLogs } from "../firebase/services";
+import { Search } from "lucide-react";
 
 const formatDate = (timestamp) => {
   if (!timestamp?.toDate) return "Pending...";
@@ -8,11 +9,22 @@ const formatDate = (timestamp) => {
 
 export default function Logs() {
   const [logs, setLogs] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const unsubscribe = listenLogs(setLogs, 100);
     return unsubscribe;
   }, []);
+
+  const filteredLogs = logs.filter((log) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      (log.guestName || "").toLowerCase().includes(query) ||
+      (log.eventType || "").toLowerCase().includes(query) ||
+      (log.message || "").toLowerCase().includes(query) ||
+      (log.keyId || "").toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div>
@@ -24,6 +36,16 @@ export default function Logs() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm overflow-x-auto">
+        <div className="mb-4 relative">
+          <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+          <input
+            type="text"
+            placeholder="Search by guest name, event type, message, or key..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 outline-none"
+          />
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left border-b">
@@ -36,7 +58,7 @@ export default function Logs() {
           </thead>
 
           <tbody>
-            {logs.map((log) => (
+            {filteredLogs.map((log) => (
               <tr key={log.id} className="border-b">
                 <td className="py-3 whitespace-nowrap">
                   {formatDate(log.createdAt)}
@@ -48,10 +70,10 @@ export default function Logs() {
               </tr>
             ))}
 
-            {logs.length === 0 && (
+            {filteredLogs.length === 0 && (
               <tr>
                 <td colSpan="5" className="py-6 text-center text-slate-500">
-                  No logs yet.
+                  {searchQuery ? "No logs match your search." : "No logs yet."}
                 </td>
               </tr>
             )}

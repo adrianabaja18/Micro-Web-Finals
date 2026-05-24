@@ -513,7 +513,10 @@ export default function Bookings() {
                 </p>
               </div>
               <div className="relative">
-                <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+                <Search
+                  className="absolute left-3 top-3 text-slate-400"
+                  size={20}
+                />
                 <input
                   type="text"
                   placeholder="Search by guest name, property, key, status, or contact..."
@@ -583,9 +586,6 @@ export default function Bookings() {
                     <td className="font-mono max-w-[180px] truncate">
                       {booking.qrToken}
                     </td>
-                    <td className="font-mono max-w-[180px] truncate">
-                      {booking.qrToken}
-                    </td>
                     <td
                       className="flex gap-2 py-2"
                       onClick={(e) => e.stopPropagation()}
@@ -611,7 +611,9 @@ export default function Bookings() {
                 {filteredBookings.length === 0 && (
                   <tr>
                     <td colSpan="7" className="py-6 text-center text-slate-500">
-                      {searchQuery ? "No bookings match your search." : "No bookings yet."}
+                      {searchQuery
+                        ? "No bookings match your search."
+                        : "No bookings yet."}
                     </td>
                   </tr>
                 )}
@@ -944,7 +946,11 @@ export default function Bookings() {
                 )}
 
                 <button
-                  onClick={() => setSelectedBooking(null)}
+                  onClick={() => {
+                    setSelectedBooking(null);
+                    setEditingAccessTime(false);
+                    setOverrideMessage("");
+                  }}
                   className="px-5 py-3 rounded-xl bg-slate-950 text-white hover:bg-slate-800 font-medium"
                 >
                   Close

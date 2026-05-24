@@ -18,6 +18,7 @@ import {
   Download,
   Search,
 } from "lucide-react";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function Bookings() {
   const [bookings, setBookings] = useState([]);
@@ -25,8 +26,14 @@ export default function Bookings() {
   const [createdQR, setCreatedQR] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [overrideLoading, setOverrideLoading] = useState(false);
   const [overrideMessage, setOverrideMessage] = useState("");
+
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    type: "",
+    booking: null,
+  });
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [editingAccessTime, setEditingAccessTime] = useState(false);
@@ -85,21 +92,6 @@ export default function Bookings() {
     });
   };
 
-  const handleGrantAccess = async (booking) => {
-    const confirmed = window.confirm(
-      `Grant access again for ${booking.guestName}? This will reactivate the booking.`,
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await updateBookingStatus(booking.id, "active");
-      setOverrideMessage("Booking access has been granted again.");
-    } catch (error) {
-      setOverrideMessage(error.message);
-    }
-  };
-
   const handleCopyToken = async (token) => {
     await navigator.clipboard.writeText(token);
     setCopied(true);
@@ -107,26 +99,6 @@ export default function Bookings() {
     setTimeout(() => {
       setCopied(false);
     }, 1500);
-  };
-
-  const handleOverrideDispense = async (booking) => {
-    const confirmed = window.confirm(
-      `Manual override will dispense ${booking.keyId} for ${booking.guestName} without QR validation. Continue?`,
-    );
-
-    if (!confirmed) return;
-
-    setOverrideLoading(true);
-    setOverrideMessage("");
-
-    try {
-      const result = await overrideDispenseKey(booking);
-      setOverrideMessage(result.message);
-    } catch (error) {
-      setOverrideMessage(error.message);
-    } finally {
-      setOverrideLoading(false);
-    }
   };
 
   const handleDownloadQR = (canvasId, guestName = "guest") => {
@@ -154,6 +126,122 @@ export default function Bookings() {
     document.body.removeChild(downloadLink);
   };
 
+  const openBookingConfirm = (type, booking) => {
+    setConfirmState({
+      open: true,
+      type,
+      booking,
+    });
+  };
+
+  const closeBookingConfirm = () => {
+    if (confirmLoading) return;
+
+    setConfirmState({
+      open: false,
+      type: "",
+      booking: null,
+    });
+  };
+
+  const getBookingConfirmContent = () => {
+    const booking = confirmState.booking;
+
+    if (!booking) {
+      return {
+        title: "Confirm Action",
+        message: "Are you sure you want to continue?",
+        confirmText: "Confirm",
+        danger: false,
+      };
+    }
+
+    switch (confirmState.type) {
+      case "delete":
+        return {
+          title: "Delete Booking",
+          message: `Delete the booking for ${booking.guestName}? This action cannot be undone.`,
+          confirmText: "Delete Booking",
+          danger: true,
+        };
+
+      case "revoke":
+        return {
+          title: "Revoke Access",
+          message: `Revoke QR access for ${booking.guestName}? The renter will no longer be able to use this QR code.`,
+          confirmText: "Revoke Access",
+          danger: true,
+        };
+
+      case "grant":
+        return {
+          title: "Grant Access",
+          message: `Grant access again for ${booking.guestName}? This will reactivate the booking.`,
+          confirmText: "Grant Access",
+          danger: false,
+        };
+
+      case "override":
+        return {
+          title: "Manual Override",
+          message: `Manually dispense ${booking.keyId} for ${booking.guestName} without QR validation? Only continue if the renter was personally verified.`,
+          confirmText: "Override Dispense",
+          danger: true,
+        };
+
+      default:
+        return {
+          title: "Confirm Action",
+          message: "Are you sure you want to continue?",
+          confirmText: "Confirm",
+          danger: false,
+        };
+    }
+  };
+
+  const handleConfirmedBookingAction = async () => {
+    const booking = confirmState.booking;
+    if (!booking) return;
+
+    setConfirmLoading(true);
+    setOverrideMessage("");
+
+    try {
+      if (confirmState.type === "delete") {
+        await deleteBooking(booking.id);
+
+        if (selectedBooking?.id === booking.id) {
+          setSelectedBooking(null);
+        }
+      }
+
+      if (confirmState.type === "revoke") {
+        await updateBookingStatus(booking.id, "revoked");
+        setOverrideMessage("Booking access has been revoked.");
+      }
+
+      if (confirmState.type === "grant") {
+        await updateBookingStatus(booking.id, "active");
+        setOverrideMessage("Booking access has been granted again.");
+      }
+
+      if (confirmState.type === "override") {
+        const result = await overrideDispenseKey(booking);
+        setOverrideMessage(result.message);
+      }
+
+      setConfirmState({
+        open: false,
+        type: "",
+        booking: null,
+      });
+    } catch (error) {
+      setOverrideMessage(error.message);
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
   const formatDateTime = (dateValue) => {
     if (!dateValue) return "-";
 
@@ -176,6 +264,21 @@ export default function Bookings() {
         return "bg-red-100 text-red-700";
       default:
         return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const getStatusDot = (status) => {
+    switch (status) {
+      case "active":
+        return "bg-green-500";
+      case "revoked":
+        return "bg-red-500";
+      case "in_use":
+        return "bg-blue-500";
+      case "completed":
+        return "bg-slate-400";
+      default:
+        return "bg-yellow-500";
     }
   };
 
@@ -331,7 +434,7 @@ export default function Bookings() {
       await updateBookingAccessWindow(
         selectedBooking.id,
         accessTimeForm.accessStart,
-        accessTimeForm.accessEnd,
+        accessTimeForm.accessEnd
       );
 
       setOverrideMessage("QR validity period updated successfully.");
@@ -362,13 +465,19 @@ export default function Bookings() {
       await updateBookingAccessWindow(
         booking.id,
         booking.accessStart,
-        newAccessEnd,
+        newAccessEnd
       );
 
       setOverrideMessage(`QR validity extended by ${amount} ${unit}.`);
     } catch (error) {
       setOverrideMessage(error.message);
     }
+  };
+
+  const closeBookingModal = () => {
+    setSelectedBooking(null);
+    setEditingAccessTime(false);
+    setOverrideMessage("");
   };
 
   return (
@@ -475,6 +584,7 @@ export default function Bookings() {
                     <p className="font-mono text-sm break-all bg-slate-100 p-3 rounded-xl flex-1">
                       {createdQR.qrToken}
                     </p>
+
                     <button
                       onClick={() => handleCopyToken(createdQR.qrToken)}
                       className="px-4 rounded-xl bg-slate-950 text-white"
@@ -487,11 +597,12 @@ export default function Bookings() {
                   {copied && (
                     <p className="text-sm text-green-600 mt-2">Token copied.</p>
                   )}
+
                   <button
                     onClick={() =>
                       handleDownloadQR(
                         "created-booking-qr",
-                        createdQR.guestName,
+                        createdQR.guestName
                       )
                     }
                     className="mt-3 inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
@@ -513,6 +624,7 @@ export default function Bookings() {
                   Click a booking row to view full details and QR code.
                 </p>
               </div>
+
               <div className="relative">
                 <Search
                   className="absolute left-3 top-3 text-slate-400"
@@ -542,93 +654,74 @@ export default function Bookings() {
               </thead>
 
               <tbody>
-                {filteredBookings.map((booking) => (
-                  <tr
-                    key={booking.id}
-                    onClick={() => {
-                      setSelectedBooking(booking);
-                      setEditingAccessTime(false);
-                      setOverrideMessage("");
-                    }}
-                    className="border-b hover:bg-slate-50 cursor-pointer transition"
-                  >
-                    <td className="py-3 font-medium">{booking.guestName}</td>
-                    <td>{booking.property}</td>
-                    <td>{booking.keyId}</td>
-                    <td className="py-3 align-top">
-                      <div className="inline-flex items-center gap-2 text-sm">
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${
-                            booking.status === "active"
-                              ? "bg-green-500"
-                              : booking.status === "revoked"
-                                ? "bg-red-500"
-                                : booking.status === "in_use"
-                                  ? "bg-blue-500"
-                                  : booking.status === "completed"
-                                    ? "bg-slate-400"
-                                    : "bg-yellow-500"
-                          }`}
-                        />
-                        <span className="capitalize text-slate-700">
-                          {booking.status}
-                        </span>
-                      </div>
-                    </td>
+                {filteredBookings.map((booking) => {
+                  const validity = getQrValidityInfo(booking);
 
-                    <td>
-                      {(() => {
-                        const validity = getQrValidityInfo(booking);
-
-                        return (
-                          <div>
-                            <td className="py-3 align-top">
-                              {(() => {
-                                const validity = getQrValidityInfo(booking);
-
-                                return (
-                                  <div className="space-y-1">
-                                    <span
-                                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${validity.color}`}
-                                    >
-                                      {validity.label}
-                                    </span>
-                                    <p className="text-[11px] leading-tight text-slate-500">
-                                      {validity.detail}
-                                    </p>
-                                  </div>
-                                );
-                              })()}
-                            </td>
-                          </div>
-                        );
-                      })()}
-                    </td>
-
-                    <td className="font-mono max-w-[180px] truncate">
-                      {booking.qrToken}
-                    </td>
-                    <td
-                      className="flex gap-2 py-2"
-                      onClick={(e) => e.stopPropagation()}
+                  return (
+                    <tr
+                      key={booking.id}
+                      onClick={() => {
+                        setSelectedBooking(booking);
+                        setEditingAccessTime(false);
+                        setOverrideMessage("");
+                      }}
+                      className="border-b hover:bg-slate-50 cursor-pointer transition"
                     >
-                      <button
-                        onClick={() =>
-                          updateBookingStatus(booking.id, "revoked")
-                        }
-                        className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                      <td className="py-3 font-medium">{booking.guestName}</td>
+                      <td>{booking.property}</td>
+                      <td>{booking.keyId}</td>
+
+                      <td className="py-3 align-top">
+                        <div className="inline-flex items-center gap-2 text-sm">
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${getStatusDot(
+                              booking.status
+                            )}`}
+                          />
+                          <span className="capitalize text-slate-700">
+                            {booking.status}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3 align-top">
+                        <div className="space-y-1">
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${validity.color}`}
+                          >
+                            {validity.label}
+                          </span>
+                          <p className="text-[11px] leading-tight text-slate-500">
+                            {validity.detail}
+                          </p>
+                        </div>
+                      </td>
+
+                      <td className="font-mono max-w-[180px] truncate">
+                        {booking.qrToken}
+                      </td>
+
+                      <td
+                        className="flex gap-2 py-2"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        Revoke
-                      </button>
-                      <button
-                        onClick={() => deleteBooking(booking.id)}
-                        className="px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <button
+                          onClick={() => openBookingConfirm("revoke", booking)}
+                          className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                        >
+                          Revoke
+                        </button>
+
+                        <button
+                          onClick={() => openBookingConfirm("delete", booking)}
+                          className="px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {filteredBookings.length === 0 && (
                   <tr>
@@ -657,11 +750,7 @@ export default function Bookings() {
               </div>
 
               <button
-                onClick={() => {
-                  setSelectedBooking(null);
-                  setEditingAccessTime(false);
-                  setOverrideMessage("");
-                }}
+                onClick={closeBookingModal}
                 className="h-10 w-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
               >
                 <X size={20} />
@@ -814,6 +903,7 @@ export default function Bookings() {
                 </div>
 
                 <DetailItem label="Booking ID" value={selectedBooking.id} />
+
                 <div>
                   <p className="text-sm text-slate-500">QR Validity</p>
                   {(() => {
@@ -838,7 +928,7 @@ export default function Bookings() {
                   <p className="text-sm text-slate-500">Status</p>
                   <span
                     className={`inline-flex mt-1 px-3 py-1 rounded-full text-xs ${getStatusStyle(
-                      selectedBooking.status,
+                      selectedBooking.status
                     )}`}
                   >
                     {selectedBooking.status}
@@ -898,11 +988,12 @@ export default function Bookings() {
                       QR token copied.
                     </p>
                   )}
+
                   <button
                     onClick={() =>
                       handleDownloadQR(
                         `booking-qr-${selectedBooking.id}`,
-                        selectedBooking.guestName,
+                        selectedBooking.guestName
                       )
                     }
                     className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium"
@@ -924,9 +1015,11 @@ export default function Bookings() {
 
               <div className="flex flex-col md:flex-row gap-3 justify-end">
                 <button
-                  onClick={() => handleOverrideDispense(selectedBooking)}
+                  onClick={() =>
+                    openBookingConfirm("override", selectedBooking)
+                  }
                   disabled={
-                    overrideLoading ||
+                    confirmLoading ||
                     selectedBooking.keyDispensed ||
                     selectedBooking.status === "completed" ||
                     selectedBooking.status === "revoked"
@@ -936,18 +1029,20 @@ export default function Bookings() {
                     selectedBooking.status === "revoked"
                       ? "Cannot override a revoked booking. Grant access first."
                       : selectedBooking.keyDispensed
-                        ? "Key is already dispensed."
-                        : selectedBooking.status === "completed"
-                          ? "Booking is already completed."
-                          : "Manually dispense this key without QR validation."
+                      ? "Key is already dispensed."
+                      : selectedBooking.status === "completed"
+                      ? "Booking is already completed."
+                      : "Manually dispense this key without QR validation."
                   }
                 >
-                  {overrideLoading ? "Processing..." : "Override Dispense Key"}
+                  {confirmLoading && confirmState.type === "override"
+                    ? "Processing..."
+                    : "Override Dispense Key"}
                 </button>
 
                 {selectedBooking.status === "revoked" ? (
                   <button
-                    onClick={() => handleGrantAccess(selectedBooking)}
+                    onClick={() => openBookingConfirm("grant", selectedBooking)}
                     className="px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 font-medium"
                   >
                     Grant Access
@@ -955,7 +1050,7 @@ export default function Bookings() {
                 ) : (
                   <button
                     onClick={() =>
-                      updateBookingStatus(selectedBooking.id, "revoked")
+                      openBookingConfirm("revoke", selectedBooking)
                     }
                     disabled={
                       selectedBooking.status === "completed" ||
@@ -968,11 +1063,7 @@ export default function Bookings() {
                 )}
 
                 <button
-                  onClick={() => {
-                    setSelectedBooking(null);
-                    setEditingAccessTime(false);
-                    setOverrideMessage("");
-                  }}
+                  onClick={closeBookingModal}
                   className="px-5 py-3 rounded-xl bg-slate-950 text-white hover:bg-slate-800 font-medium"
                 >
                   Close
@@ -982,6 +1073,17 @@ export default function Bookings() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmState.open}
+        title={getBookingConfirmContent().title}
+        message={getBookingConfirmContent().message}
+        confirmText={getBookingConfirmContent().confirmText}
+        danger={getBookingConfirmContent().danger}
+        loading={confirmLoading}
+        onCancel={closeBookingConfirm}
+        onConfirm={handleConfirmedBookingAction}
+      />
     </div>
   );
 }

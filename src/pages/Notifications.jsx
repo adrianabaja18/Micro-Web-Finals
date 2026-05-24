@@ -5,6 +5,7 @@ import {
   markNotificationRead,
 } from "../firebase/services";
 import { CheckCheck, Trash2 } from "lucide-react";
+import ConfirmModal from "../components/ConfirmModal";
 
 const formatDate = (timestamp) => {
   if (!timestamp?.toDate) return "Pending...";
@@ -16,6 +17,7 @@ export default function Notifications() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [clearMessage, setClearMessage] = useState("");
   const [isClearing, setIsClearing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = listenNotifications(setNotifications);
@@ -38,18 +40,13 @@ export default function Notifications() {
   });
 
   const handleClearNotifications = async () => {
-    const confirmed = window.confirm(
-      "Clear all notifications? This action cannot be undone.",
-    );
-
-    if (!confirmed) return;
-
     setIsClearing(true);
     setClearMessage("");
 
     try {
       const result = await clearNotifications();
       setClearMessage(result.message);
+      setConfirmOpen(false);
     } catch (error) {
       setClearMessage(error.message);
     } finally {
@@ -78,7 +75,7 @@ export default function Notifications() {
           </button>
 
           <button
-            onClick={handleClearNotifications}
+            onClick={() => setConfirmOpen(true)}
             disabled={isClearing || notifications.length === 0}
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -106,6 +103,7 @@ export default function Notifications() {
           >
             All
           </button>
+
           <button
             onClick={() => setFilterStatus("unread")}
             className={`px-4 py-2 rounded-lg font-medium transition ${
@@ -116,6 +114,7 @@ export default function Notifications() {
           >
             Unread {unreadCount > 0 && `(${unreadCount})`}
           </button>
+
           <button
             onClick={() => setFilterStatus("read")}
             className={`px-4 py-2 rounded-lg font-medium transition ${
@@ -165,11 +164,22 @@ export default function Notifications() {
             {filterStatus === "unread"
               ? "No unread notifications."
               : filterStatus === "read"
-                ? "No read notifications."
-                : "No notifications yet."}
+              ? "No read notifications."
+              : "No notifications yet."}
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Clear Notifications"
+        message="Are you sure you want to clear all notifications? This action cannot be undone."
+        confirmText="Clear Notifications"
+        danger
+        loading={isClearing}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleClearNotifications}
+      />
     </div>
   );
 }

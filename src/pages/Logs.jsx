@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { clearAccessLogs, listenLogs } from "../firebase/services";
 import { Search, Trash2 } from "lucide-react";
+import ConfirmModal from "../components/ConfirmModal";
 
 const formatDate = (timestamp) => {
   if (!timestamp?.toDate) return "Pending...";
@@ -12,6 +13,7 @@ export default function Logs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [clearMessage, setClearMessage] = useState("");
   const [isClearing, setIsClearing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = listenLogs(setLogs, 100);
@@ -29,18 +31,13 @@ export default function Logs() {
   });
 
   const handleClearLogs = async () => {
-    const confirmed = window.confirm(
-      "Clear all access logs? This action cannot be undone.",
-    );
-
-    if (!confirmed) return;
-
     setIsClearing(true);
     setClearMessage("");
 
     try {
       const result = await clearAccessLogs();
       setClearMessage(result.message);
+      setConfirmOpen(false);
     } catch (error) {
       setClearMessage(error.message);
     } finally {
@@ -59,7 +56,7 @@ export default function Logs() {
         </div>
 
         <button
-          onClick={handleClearLogs}
+          onClick={() => setConfirmOpen(true)}
           disabled={isClearing || logs.length === 0}
           className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -125,6 +122,17 @@ export default function Logs() {
         Clearing logs only removes access log records. Notifications and booking
         records will remain.
       </p>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Clear Logs"
+        message="Are you sure you want to clear all access logs? This action cannot be undone."
+        confirmText="Clear Logs"
+        danger
+        loading={isClearing}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleClearLogs}
+      />
     </div>
   );
 }

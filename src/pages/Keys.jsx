@@ -6,6 +6,7 @@ import {
   updateKeyStatus,
 } from "../firebase/services";
 import { Trash2 } from "lucide-react";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function Keys() {
   const [keys, setKeys] = useState([]);
@@ -16,6 +17,12 @@ export default function Keys() {
     rfidUid: "",
     status: "available",
   });
+
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    key: null,
+  });
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = listenKeys(setKeys);
@@ -54,20 +61,30 @@ export default function Keys() {
     }
   };
 
-  const handleDeleteKey = async (key) => {
-    const confirmed = window.confirm(
-      `Delete ${key.id}? This will remove the key record from the system.`,
-    );
+  const requestDeleteKey = (key) => {
+    setConfirmState({
+      open: true,
+      key,
+    });
+  };
 
-    if (!confirmed) return;
+  const confirmDeleteKey = async () => {
+    if (!confirmState.key) return;
 
+    setDeleteLoading(true);
     setMessage("");
 
     try {
-      await deleteKeyRecord(key);
-      setMessage(`${key.id} deleted successfully.`);
+      await deleteKeyRecord(confirmState.key);
+      setMessage(`${confirmState.key.id} deleted successfully.`);
+      setConfirmState({
+        open: false,
+        key: null,
+      });
     } catch (error) {
       setMessage(error.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -198,7 +215,7 @@ export default function Keys() {
                       </button>
 
                       <button
-                        onClick={() => handleDeleteKey(key)}
+                        onClick={() => requestDeleteKey(key)}
                         disabled={
                           key.status === "dispensed" || key.currentBookingId
                         }
@@ -233,6 +250,23 @@ export default function Keys() {
           </p>
         </div>
       </div>
+      <ConfirmModal
+        open={confirmState.open}
+        title="Delete Key"
+        message={`Are you sure you want to delete ${
+          confirmState.key?.id || "this key"
+        }? This action cannot be undone.`}
+        confirmText="Delete Key"
+        danger
+        loading={deleteLoading}
+        onCancel={() =>
+          setConfirmState({
+            open: false,
+            key: null,
+          })
+        }
+        onConfirm={confirmDeleteKey}
+      />
     </div>
   );
 }

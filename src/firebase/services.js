@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
@@ -830,23 +831,27 @@ export async function clearNotifications() {
 // =====================
 
 export async function createDeviceIfMissing() {
-  await setDoc(
-    doc(db, "devices", "DEVICE_001"),
-    {
-      name: "Main Key Dispenser",
-      status: "offline",
-      currentMode: "standby",
-      lcdMessage: "System Ready",
-      motorStatus: "idle",
-      keySlotStatus: "empty",
-      irDetected: false,
-      lastScannedQr: "",
-      lastRfidUid: "",
-      lastError: "",
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+  const deviceRef = doc(db, "devices", "DEVICE_001");
+  const deviceSnapshot = await getDoc(deviceRef);
+
+  if (deviceSnapshot.exists()) {
+    return;
+  }
+
+  await setDoc(deviceRef, {
+    name: "Main Key Dispenser",
+    status: "offline",
+    currentMode: "standby",
+    lcdMessage: "System Ready",
+    motorStatus: "idle",
+    returnStatus: "idle",
+    keySlotStatus: "empty",
+    irDetected: false,
+    lastScannedQr: "",
+    lastRfidUid: "",
+    lastError: "",
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function updateDeviceStatus(data) {

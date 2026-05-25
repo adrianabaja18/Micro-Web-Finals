@@ -23,7 +23,7 @@ export default function Dashboard() {
     const unsubDevice = listenDevice(setDevice);
     const unsubBookings = listenBookings(setBookings);
     const unsubKeys = listenKeys(setKeys);
-    const unsubLogs = listenLogs(setLogs, 5);
+    const unsubLogs = listenLogs(setLogs, 25);
     const unsubNotifications = listenNotifications(setNotifications);
 
     return () => {
@@ -40,15 +40,15 @@ export default function Dashboard() {
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
-    <div>
-      <div className="mb-8">
+    <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+      <div className="mb-6 shrink-0">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-slate-500">
           Real-time monitoring for the automated key dispenser.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-4 gap-4 shrink-0">
         <StatCard
           title="Device Status"
           value={device?.status || "offline"}
@@ -75,11 +75,13 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mt-8">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <h2 className="text-lg font-bold mb-4">Recent Logs</h2>
+      <div className="grid lg:grid-cols-2 gap-6 mt-6 flex-1 min-h-0">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col min-h-0">
+          <div className="mb-4 shrink-0">
+            <h2 className="text-lg font-bold">Recent Logs</h2>
+          </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
             {logs.length === 0 && (
               <p className="text-sm text-slate-500">No logs yet.</p>
             )}
@@ -93,15 +95,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <h2 className="text-lg font-bold mb-4">Latest Notifications</h2>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col min-h-0">
+          <div className="mb-4 shrink-0">
+            <h2 className="text-lg font-bold">Latest Notifications</h2>
+          </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
             {notifications.length === 0 && (
               <p className="text-sm text-slate-500">No notifications yet.</p>
             )}
 
-            {notifications.slice(0, 5).map((notif) => (
+            {notifications.map((notif) => (
               <div
                 key={notif.id}
                 className={`p-3 rounded-xl ${

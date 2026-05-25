@@ -16,7 +16,7 @@ export default function Logs() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = listenLogs(setLogs, 100);
+    const unsubscribe = listenLogs(setLogs, 250);
     return unsubscribe;
   }, []);
 
@@ -46,8 +46,8 @@ export default function Logs() {
   };
 
   return (
-    <div>
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-3xl font-bold">Access Logs</h1>
           <p className="text-slate-500">
@@ -66,13 +66,13 @@ export default function Logs() {
       </div>
 
       {clearMessage && (
-        <div className="mb-5 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm">
+        <div className="mb-5 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm shrink-0">
           {clearMessage}
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm overflow-x-auto">
-        <div className="mb-4 relative">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col flex-1 min-h-0">
+        <div className="mb-4 relative shrink-0">
           <Search className="absolute left-3 top-3 text-slate-400" size={20} />
           <input
             type="text"
@@ -83,42 +83,46 @@ export default function Logs() {
           />
         </div>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left border-b">
-              <th className="py-3">Time</th>
-              <th>Event</th>
-              <th>Message</th>
-              <th>Guest</th>
-              <th>Key</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredLogs.map((log) => (
-              <tr key={log.id} className="border-b">
-                <td className="py-3 whitespace-nowrap">
-                  {formatDate(log.createdAt)}
-                </td>
-                <td className="font-medium">{log.eventType}</td>
-                <td>{log.message}</td>
-                <td>{log.guestName || "-"}</td>
-                <td>{log.keyId || "-"}</td>
+        <div className="overflow-auto flex-1 min-h-0">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr className="text-left border-b">
+                <th className="py-3">Time</th>
+                <th>Event</th>
+                <th>Message</th>
+                <th>Guest</th>
+                <th>Key</th>
               </tr>
-            ))}
+            </thead>
 
-            {filteredLogs.length === 0 && (
-              <tr>
-                <td colSpan="5" className="py-6 text-center text-slate-500">
-                  {searchQuery ? "No logs match your search." : "No logs yet."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            <tbody>
+              {filteredLogs.map((log) => (
+                <tr key={log.id} className="border-b">
+                  <td className="py-3 whitespace-nowrap">
+                    {formatDate(log.createdAt)}
+                  </td>
+                  <td className="font-medium">{log.eventType}</td>
+                  <td>{log.message}</td>
+                  <td>{log.guestName || "-"}</td>
+                  <td>{log.keyId || "-"}</td>
+                </tr>
+              ))}
+
+              {filteredLogs.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="py-6 text-center text-slate-500">
+                    {searchQuery
+                      ? "No logs match your search."
+                      : "No logs yet."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <p className="text-xs text-slate-500 mt-4">
+      <p className="text-xs text-slate-500 mt-4 shrink-0">
         Clearing logs only removes access log records. Notifications and booking
         records will remain.
       </p>

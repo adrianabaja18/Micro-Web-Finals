@@ -55,8 +55,8 @@ export default function Notifications() {
   };
 
   return (
-    <div>
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-3xl font-bold">Notifications</h1>
           <p className="text-slate-500">
@@ -86,12 +86,12 @@ export default function Notifications() {
       </div>
 
       {clearMessage && (
-        <div className="mb-5 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm">
+        <div className="mb-5 rounded-xl bg-blue-50 text-blue-700 px-4 py-3 text-sm shrink-0">
           {clearMessage}
         </div>
       )}
 
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setFilterStatus("all")}
@@ -128,46 +128,48 @@ export default function Notifications() {
         </div>
       </div>
 
-      <div className="space-y-4">
-        {filteredNotifications.map((notif) => (
-          <div
-            key={notif.id}
-            className={`rounded-2xl border p-5 shadow-sm ${
-              notif.read
-                ? "bg-white border-slate-200"
-                : "bg-blue-50 border-blue-200"
-            }`}
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <h2 className="font-bold">{notif.title}</h2>
-                <p className="text-slate-600">{notif.message}</p>
-                <p className="text-xs text-slate-400 mt-2">
-                  {formatDate(notif.createdAt)}
-                </p>
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex-1 min-h-0 overflow-y-auto">
+        <div className="space-y-4">
+          {filteredNotifications.map((notif) => (
+            <div
+              key={notif.id}
+              className={`rounded-2xl border p-5 shadow-sm ${
+                notif.read
+                  ? "bg-white border-slate-200"
+                  : "bg-blue-50 border-blue-200"
+              }`}
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-bold">{notif.title}</h2>
+                  <p className="text-slate-600">{notif.message}</p>
+                  <p className="text-xs text-slate-400 mt-2">
+                    {formatDate(notif.createdAt)}
+                  </p>
+                </div>
+
+                {!notif.read && (
+                  <button
+                    onClick={() => markNotificationRead(notif.id)}
+                    className="px-4 py-2 rounded-xl bg-slate-950 text-white"
+                  >
+                    Mark as read
+                  </button>
+                )}
               </div>
-
-              {!notif.read && (
-                <button
-                  onClick={() => markNotificationRead(notif.id)}
-                  className="px-4 py-2 rounded-xl bg-slate-950 text-white"
-                >
-                  Mark as read
-                </button>
-              )}
             </div>
-          </div>
-        ))}
+          ))}
 
-        {filteredNotifications.length === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500">
-            {filterStatus === "unread"
-              ? "No unread notifications."
-              : filterStatus === "read"
-              ? "No read notifications."
-              : "No notifications yet."}
-          </div>
-        )}
+          {filteredNotifications.length === 0 && (
+            <div className="p-8 text-center text-slate-500">
+              {filterStatus === "unread"
+                ? "No unread notifications."
+                : filterStatus === "read"
+                ? "No read notifications."
+                : "No notifications yet."}
+            </div>
+          )}
+        </div>
       </div>
 
       <ConfirmModal

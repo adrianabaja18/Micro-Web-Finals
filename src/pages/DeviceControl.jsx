@@ -9,6 +9,7 @@ import {
   Settings,
 } from "lucide-react";
 import {
+  cancelPendingDeviceCommands,
   createDeviceIfMissing,
   listenBookings,
   listenCommands,
@@ -150,6 +151,28 @@ export default function DeviceControl() {
   function copyToken(token) {
     navigator.clipboard.writeText(token);
     setQrToken(token);
+  }
+
+  async function handleCancelPendingCommands() {
+    setLoading(true);
+
+    try {
+      const response = await cancelPendingDeviceCommands();
+
+      setResult({
+        valid: true,
+        code: "PENDING_COMMANDS_CANCELLED",
+        message: response.message,
+      });
+    } catch (error) {
+      setResult({
+        valid: false,
+        code: "ERROR",
+        message: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -318,7 +341,8 @@ export default function DeviceControl() {
             <div>
               <h3 className="font-semibold mb-2">Motor 1</h3>
               <p className="text-xs text-slate-500 mb-3">
-                Controls the first flap used after proximity + RFID confirmation.
+                Controls the first flap used after proximity + RFID
+                confirmation.
               </p>
 
               <div className="grid sm:grid-cols-3 gap-3">
@@ -332,7 +356,9 @@ export default function DeviceControl() {
                 />
                 <CommandButton
                   label="Motor 1 Open + Close"
-                  onClick={() => handleCommand("CYCLE_MOTOR1", "Motor 1 Open + Close")}
+                  onClick={() =>
+                    handleCommand("CYCLE_MOTOR1", "Motor 1 Open + Close")
+                  }
                 />
               </div>
             </div>
@@ -354,7 +380,9 @@ export default function DeviceControl() {
                 />
                 <CommandButton
                   label="Motor 2 Open + Close"
-                  onClick={() => handleCommand("CYCLE_MOTOR2", "Motor 2 Open + Close")}
+                  onClick={() =>
+                    handleCommand("CYCLE_MOTOR2", "Motor 2 Open + Close")
+                  }
                 />
               </div>
             </div>
@@ -364,13 +392,33 @@ export default function DeviceControl() {
               <div className="grid sm:grid-cols-2 gap-3">
                 <CommandButton
                   label="Run Both Motors"
-                  onClick={() => handleCommand("CYCLE_BOTH_MOTORS", "Run Both Motors")}
+                  onClick={() =>
+                    handleCommand("CYCLE_BOTH_MOTORS", "Run Both Motors")
+                  }
                 />
                 <CommandButton
                   label="Stop All Motors"
-                  onClick={() => handleCommand("STOP_ALL_MOTORS", "Stop All Motors")}
+                  onClick={() =>
+                    handleCommand("STOP_ALL_MOTORS", "Stop All Motors")
+                  }
                 />
               </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2 text-red-700">Command Reset</h3>
+              <p className="text-xs text-slate-500 mb-3">
+                Use this if a command is stuck on pending or the ESP32 executes
+                old commands after restart.
+              </p>
+
+              <button
+                onClick={handleCancelPendingCommands}
+                disabled={loading}
+                className="w-full px-4 py-3 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Clear Pending Commands
+              </button>
             </div>
           </div>
         </div>

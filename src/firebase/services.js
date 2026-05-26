@@ -883,11 +883,20 @@ export function listenDevice(callback) {
 // =====================
 
 export async function sendDeviceCommand(command, payload = {}) {
+  const commandDocRef = await addDoc(collection(db, "commands"), {
+    deviceId: "DEVICE_001",
+    command,
+    payload,
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
+
   await setDoc(
     doc(db, "devices", "DEVICE_001"),
     {
       command,
       commandStatus: "pending",
+      commandId: commandDocRef.id,
       commandPayload: payload,
       commandSource: "webserver",
       commandCreatedAt: serverTimestamp(),
@@ -895,14 +904,6 @@ export async function sendDeviceCommand(command, payload = {}) {
     },
     { merge: true },
   );
-
-  await addDoc(collection(db, "commands"), {
-    deviceId: "DEVICE_001",
-    command,
-    payload,
-    status: "pending",
-    createdAt: serverTimestamp(),
-  });
 
   await addLog({
     eventType: "DEVICE_COMMAND_SENT",
@@ -915,7 +916,64 @@ export async function sendDeviceCommand(command, payload = {}) {
     type: "info",
   });
 
-  return command;
+  return commandDocRef.id;
+}
+
+export async function cancelPendingDeviceCommands() {
+  await setDoc(
+    doc(db, "devices", "DEVICE_001"),
+    {
+      command: "",
+      commandStatus: "cancelled",
+      commandId: "",
+      commandPayload: {},
+      motorStatus: "idle",
+      lcdMessage: "Pending Command Cleared",
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  const pendingSnapshot = await getDocs(
+    query(collection(db, "commands"), where("status", "==", "pending")),
+  );
+
+  const batch = writeBatch(db);
+  let cancelledCount = 0;
+
+  pendingSnapshot.docs.forEach((commandDoc) => {
+    const commandData = commandDoc.data();
+
+    if (commandData.deviceId === "DEVICE_001") {
+      batch.update(doc(db, "commands", commandDoc.id), {
+        status: "cancelled",
+        cancelledAt: serverTimestamp(),
+      });
+
+      cancelledCount += 1;
+    }
+  });
+
+  if (cancelledCount > 0) {
+    await batch.commit();
+  }
+
+  await addLog({
+    eventType: "DEVICE_COMMANDS_CANCELLED",
+    message: `${cancelledCount} pending command(s) cancelled.`,
+  });
+
+  await addNotification({
+    title: "Pending Commands Cleared",
+    message: `${cancelledCount} pending command(s) were cancelled for the ESP32.`,
+    type: "warning",
+  });
+
+  return {
+    success: true,
+    cancelledCount,
+    message: `${cancelledCount} pending command(s) cancelled.`,
+  };
 }
 
 export function listenCommands(callback) {

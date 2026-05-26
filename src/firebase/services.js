@@ -883,7 +883,20 @@ export function listenDevice(callback) {
 // =====================
 
 export async function sendDeviceCommand(command, payload = {}) {
-  const docRef = await addDoc(collection(db, "commands"), {
+  await setDoc(
+    doc(db, "devices", "DEVICE_001"),
+    {
+      command,
+      commandStatus: "pending",
+      commandPayload: payload,
+      commandSource: "webserver",
+      commandCreatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await addDoc(collection(db, "commands"), {
     deviceId: "DEVICE_001",
     command,
     payload,
@@ -893,7 +906,7 @@ export async function sendDeviceCommand(command, payload = {}) {
 
   await addLog({
     eventType: "DEVICE_COMMAND_SENT",
-    message: `Command sent: ${command}`,
+    message: `Command sent to ESP32: ${command}`,
   });
 
   await addNotification({
@@ -902,7 +915,7 @@ export async function sendDeviceCommand(command, payload = {}) {
     type: "info",
   });
 
-  return docRef.id;
+  return command;
 }
 
 export function listenCommands(callback) {

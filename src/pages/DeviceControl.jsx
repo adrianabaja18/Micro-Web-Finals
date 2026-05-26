@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import {
   Cpu,
   KeyRound,
-  Monitor,
   QrCode,
   Radio,
   RefreshCw,
   Send,
+  Settings,
 } from "lucide-react";
 import {
   createDeviceIfMissing,
@@ -27,7 +27,6 @@ export default function DeviceControl() {
 
   const [qrToken, setQrToken] = useState("");
   const [rfidUid, setRfidUid] = useState("");
-  const [lcdMessage, setLcdMessage] = useState("");
   const [result, setResult] = useState(null);
   const [validatedBooking, setValidatedBooking] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -126,22 +125,7 @@ export default function DeviceControl() {
     }
   }
 
-  async function handleUpdateLcd(e) {
-    e.preventDefault();
-
-    await updateDeviceStatus({
-      lcdMessage,
-      currentMode: "manual_lcd_update",
-    });
-
-    setResult({
-      valid: true,
-      code: "LCD_UPDATED",
-      message: `LCD message updated to: ${lcdMessage}`,
-    });
-  }
-
-  async function handleCommand(command) {
+  async function handleCommand(command, label) {
     setLoading(true);
 
     try {
@@ -150,7 +134,7 @@ export default function DeviceControl() {
       setResult({
         valid: true,
         code: "COMMAND_SENT",
-        message: `${command} command was saved to Firebase.`,
+        message: `${label || command} command was sent to the ESP32.`,
       });
     } catch (error) {
       setResult({
@@ -173,7 +157,7 @@ export default function DeviceControl() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Device Control</h1>
         <p className="text-slate-500">
-          Simulate ESP32 actions before the hardware is available.
+          Monitor device status and send motor commands to the ESP32.
         </p>
       </div>
 
@@ -187,7 +171,7 @@ export default function DeviceControl() {
           <div className="space-y-3 text-sm">
             <Info label="Status" value={device?.status || "offline"} />
             <Info label="Mode" value={device?.currentMode || "standby"} />
-            <Info label="LCD" value={device?.lcdMessage || "No message"} />
+            <Info label="Message" value={device?.lcdMessage || "No message"} />
             <Info label="Motor" value={device?.motorStatus || "idle"} />
             <Info
               label="IR Detected"
@@ -195,6 +179,8 @@ export default function DeviceControl() {
             />
             <Info label="Last QR" value={device?.lastScannedQr || "-"} />
             <Info label="Last RFID" value={device?.lastRfidUid || "-"} />
+            <Info label="Command" value={device?.command || "-"} />
+            <Info label="Command Status" value={device?.commandStatus || "-"} />
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-5">
@@ -324,73 +310,96 @@ export default function DeviceControl() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <Monitor className="text-slate-700" />
-            <h2 className="text-lg font-bold">LCD Message Test</h2>
+            <Settings className="text-slate-700" />
+            <h2 className="text-lg font-bold">Motor Controls</h2>
           </div>
 
-          <form onSubmit={handleUpdateLcd} className="space-y-3">
-            <input
-              value={lcdMessage}
-              onChange={(e) => setLcdMessage(e.target.value)}
-              placeholder="Enter LCD message"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3"
-              required
-            />
+          <div className="space-y-5">
+            <div>
+              <h3 className="font-semibold mb-2">Motor 1</h3>
+              <p className="text-xs text-slate-500 mb-3">
+                Controls the first flap used after proximity + RFID confirmation.
+              </p>
 
-            <button className="w-full px-5 py-3 rounded-xl bg-slate-950 text-white font-semibold">
-              Update LCD Message
-            </button>
-          </form>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <CommandButton
+                  label="Motor 1 Open"
+                  onClick={() => handleCommand("OPEN_MOTOR1", "Motor 1 Open")}
+                />
+                <CommandButton
+                  label="Motor 1 Close"
+                  onClick={() => handleCommand("CLOSE_MOTOR1", "Motor 1 Close")}
+                />
+                <CommandButton
+                  label="Motor 1 Open + Close"
+                  onClick={() => handleCommand("CYCLE_MOTOR1", "Motor 1 Open + Close")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2">Motor 2</h3>
+              <p className="text-xs text-slate-500 mb-3">
+                Controls the second flap for final key release.
+              </p>
+
+              <div className="grid sm:grid-cols-3 gap-3">
+                <CommandButton
+                  label="Motor 2 Open"
+                  onClick={() => handleCommand("OPEN_MOTOR2", "Motor 2 Open")}
+                />
+                <CommandButton
+                  label="Motor 2 Close"
+                  onClick={() => handleCommand("CLOSE_MOTOR2", "Motor 2 Close")}
+                />
+                <CommandButton
+                  label="Motor 2 Open + Close"
+                  onClick={() => handleCommand("CYCLE_MOTOR2", "Motor 2 Open + Close")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2">Both Motors</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <CommandButton
+                  label="Run Both Motors"
+                  onClick={() => handleCommand("CYCLE_BOTH_MOTORS", "Run Both Motors")}
+                />
+                <CommandButton
+                  label="Stop All Motors"
+                  onClick={() => handleCommand("STOP_ALL_MOTORS", "Stop All Motors")}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mt-6">
         <div className="flex items-center gap-3 mb-4">
           <Send className="text-slate-700" />
-          <h2 className="text-lg font-bold">Hardware Commands</h2>
+          <h2 className="text-lg font-bold">Recent Commands</h2>
         </div>
 
-        <div className="grid md:grid-cols-4 gap-3">
-          <CommandButton
-            label="Test Motor Open"
-            onClick={() => handleCommand("TEST_MOTOR_OPEN")}
-          />
-          <CommandButton
-            label="Test Motor Close"
-            onClick={() => handleCommand("TEST_MOTOR_CLOSE")}
-          />
-          <CommandButton
-            label="LCD Test"
-            onClick={() => handleCommand("LCD_TEST")}
-          />
-          <CommandButton
-            label="Reset Device"
-            onClick={() => handleCommand("RESET_DEVICE")}
-          />
-        </div>
-
-        <div className="mt-5">
-          <h3 className="font-semibold mb-2">Recent Commands</h3>
-
-          <div className="space-y-2 max-h-44 overflow-y-auto">
-            {commands.slice(0, 5).map((command) => (
-              <div
-                key={command.id}
-                className="flex items-center justify-between bg-slate-50 rounded-xl p-3 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{command.command}</p>
-                  <p className="text-slate-500">Status: {command.status}</p>
-                </div>
-
-                <RefreshCw size={16} className="text-slate-400" />
+        <div className="space-y-2 max-h-44 overflow-y-auto">
+          {commands.slice(0, 8).map((command) => (
+            <div
+              key={command.id}
+              className="flex items-center justify-between bg-slate-50 rounded-xl p-3 text-sm"
+            >
+              <div>
+                <p className="font-medium">{command.command}</p>
+                <p className="text-slate-500">Status: {command.status}</p>
               </div>
-            ))}
 
-            {commands.length === 0 && (
-              <p className="text-sm text-slate-500">No commands sent yet.</p>
-            )}
-          </div>
+              <RefreshCw size={16} className="text-slate-400" />
+            </div>
+          ))}
+
+          {commands.length === 0 && (
+            <p className="text-sm text-slate-500">No commands sent yet.</p>
+          )}
         </div>
       </div>
 
@@ -423,7 +432,7 @@ function CommandButton({ label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium"
+      className="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium transition"
     >
       {label}
     </button>

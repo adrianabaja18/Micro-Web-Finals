@@ -399,7 +399,7 @@ export default function DeviceControl() {
                 <CommandButton
                   label="Stop All Motors"
                   onClick={() =>
-                    handleCommand("STOP_ALL_MOTORS", "Stop All Motors")
+                    handleCommand("STOP_MOTORS", "Stop All Motors")
                   }
                 />
               </div>

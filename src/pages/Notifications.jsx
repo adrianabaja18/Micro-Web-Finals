@@ -165,8 +165,8 @@ export default function Notifications() {
               {filterStatus === "unread"
                 ? "No unread notifications."
                 : filterStatus === "read"
-                ? "No read notifications."
-                : "No notifications yet."}
+                  ? "No read notifications."
+                  : "No notifications yet."}
             </div>
           )}
         </div>
